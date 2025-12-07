@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hydroopt"
-version = "2.5.0"
+version = "0.2.8"
 authors = [
     {name = "Gladistony Silva Lins", email = "seu-email@exemplo.com"}
 ]
