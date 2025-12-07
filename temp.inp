@@ -1,0 +1,218 @@
+; Filename: /mnt/discoD/Github/HydroOpt/HydroOpt/redes/hanoiFIM.inp
+; WNTR: 1.4.0
+; Created: 2025-12-07 16:41:15
+[TITLE]
+
+[JUNCTIONS]
+;ID                      Elevation       Demand Pattern                 
+ 2                                  0         247.222                            ;
+ 3                                  0         236.111                            ;
+ 4                                  0          36.111                            ;
+ 5                                  0         201.389                            ;
+ 6                                  0         279.167                            ;
+ 7                                  0             375                            ;
+ 8                                  0         152.778                            ;
+ 9                                  0         145.833                            ;
+ 10                                 0         145.833                            ;
+ 11                                 0         138.889                            ;
+ 12                                 0         155.556                            ;
+ 13                                 0         261.111                            ;
+ 14                                 0         170.833                            ;
+ 15                                 0           77.78                            ;
+ 16                                 0          86.111                            ;
+ 17                                 0         240.278                            ;
+ 18                                 0         373.611                            ;
+ 19                                 0          16.667                            ;
+ 20                                 0         354.167                            ;
+ 21                                 0         258.333                            ;
+ 22                                 0         134.722                            ;
+ 23                                 0         290.278                            ;
+ 24                                 0         227.778                            ;
+ 25                                 0          47.222                            ;
+ 26                                 0             250                            ;
+ 27                                 0         102.778                            ;
+ 28                                 0          80.556                            ;
+ 29                                 0             100                            ;
+ 30                                 0             100                            ;
+ 31                                 0          29.167                            ;
+ 32                                 0         223.611                            ;
+
+[RESERVOIRS]
+;ID                                   Head                  Pattern
+ 1                                100                            ;
+
+[TANKS]
+;ID                              Elevation           Init Level            Min Level            Max Level             Diameter           Min Volume Volume Curve         Overflow            
+
+[PIPES]
+;ID                   Node1                Node2                              Length             Diameter            Roughness           Minor Loss               Status
+ 1                    1                    2                                100             508             130               0                 Open   ;
+ 2                    2                    3                               1350             508             130               0                 Open   ;
+ 3                    3                    4                                900             508             130               0                 Open   ;
+ 4                    4                    5                               1150             508             130               0                 Open   ;
+ 5                    5                    6                               1450             508             130               0                 Open   ;
+ 6                    6                    7                                450             508             130               0                 Open   ;
+ 7                    7                    8                                850             508             130               0                 Open   ;
+ 8                    8                    9                                850             508             130               0                 Open   ;
+ 9                    9                    10                               800             508             130               0                 Open   ;
+ 10                   10                   11                               950             508             130               0                 Open   ;
+ 11                   11                   12                              1200             508             130               0                 Open   ;
+ 12                   12                   13                              3500             508             130               0                 Open   ;
+ 13                   10                   14                               800             508             130               0                 Open   ;
+ 14                   14                   15                               500             508             130               0                 Open   ;
+ 15                   15                   16                               550             508             130               0                 Open   ;
+ 16                   16                   17                              2730             508             130               0                 Open   ;
+ 17                   17                   18                              1750             508             130               0                 Open   ;
+ 18                   18                   19                               800             508             130               0                 Open   ;
+ 19                   19                   3                                400             508             130               0                 Open   ;
+ 20                   3                    20                              2200             508             130               0                 Open   ;
+ 21                   20                   21                              1500             508             130               0                 Open   ;
+ 22                   21                   22                               500             508             130               0                 Open   ;
+ 23                   20                   23                              2650             508             130               0                 Open   ;
+ 24                   23                   24                              1230             508             130               0                 Open   ;
+ 25                   24                   25                              1300             508             130               0                 Open   ;
+ 26                   25                   26                               850             508             130               0                 Open   ;
+ 27                   26                   27                               300             508             130               0                 Open   ;
+ 28                   27                   16                               750             508             130               0                 Open   ;
+ 29                   23                   28                              1500             508             130               0                 Open   ;
+ 30                   28                   29                              2000             508             130               0                 Open   ;
+ 31                   29                   30                              1600             508             130               0                 Open   ;
+ 32                   30                   31                               150             508             130               0                 Open   ;
+ 33                   31                   32                               860             508             130               0                 Open   ;
+ 34                   32                   25                               950             508             130               0                 Open   ;
+
+[PUMPS]
+;ID                   Node1                Node2                Properties          
+
+[VALVES]
+;ID                   Node1                Node2                            Diameter Type              Setting           Minor Loss
+
+[TAGS]
+;type      name       tag       
+
+[DEMANDS]
+;ID        Demand     Pattern   
+
+[STATUS]
+;ID        Setting   
+
+[PATTERNS]
+;ID        Multipliers
+
+[CURVES]
+;ID         X-Value      Y-Value     
+
+[CONTROLS]
+
+[RULES]
+
+[ENERGY]
+GLOBAL EFFICIENCY      75.0000
+GLOBAL PRICE           0.0000
+DEMAND CHARGE          0.0000
+
+[EMITTERS]
+;ID        Flow coefficient
+
+[QUALITY]
+
+[SOURCES]
+;Node      Type       Quality    Pattern   
+
+[REACTIONS]
+;Type           Pipe/Tank               Coefficient
+
+ ORDER BULK 1
+ ORDER TANK 1
+ ORDER WALL 1
+ GLOBAL BULK 0.0000    
+ GLOBAL WALL 0.0000    
+
+[MIXING]
+;Tank ID             Model Fraction
+
+[TIMES]
+DURATION             00:00:00
+HYDRAULIC TIMESTEP   01:00:00
+QUALITY TIMESTEP     00:05:00
+PATTERN TIMESTEP     01:00:00
+PATTERN START        00:00:00
+REPORT TIMESTEP      01:00:00
+REPORT START         00:00:00
+START CLOCKTIME      00:00:00 AM
+RULE TIMESTEP        00:06:00
+STATISTIC            NONE      
+
+[REPORT]
+SUMMARY    NO
+PAGE       0
+DEMAND     PRECISION  2.0
+HEAD       PRECISION  2.0
+PRESSURE   PRECISION  2.0
+FLOW       PRECISION  2.0
+VELOCITY   PRECISION  2.0
+HEADLOSS   PRECISION  2.0
+
+[OPTIONS]
+UNITS                LPS                 
+HEADLOSS             H-W                 
+SPECIFIC GRAVITY     1
+VISCOSITY            1
+TRIALS               40
+ACCURACY             0.001
+CHECKFREQ            10
+MAXCHECK             10
+UNBALANCED           CONTINUE 10
+DEMAND MULTIPLIER    1
+PRESSURE             METERS              
+EMITTER EXPONENT     0.5
+QUALITY              NONE                
+DIFFUSIVITY          1
+TOLERANCE            0.01
+
+[COORDINATES]
+;Node      X-Coord    Y-Coord   
+2                5542.370000000       2711.860000000
+3                5440.680000000       3677.970000000
+4                6440.680000000       3711.860000000
+5                7440.680000000       3711.860000000
+6                8491.530000000       3745.760000000
+7                8457.630000000       4559.320000000
+8                8423.730000000       5610.170000000
+9                8372.880000000       6576.270000000
+10               7406.780000000       6610.170000000
+11               7372.880000000       7474.580000000
+12               7372.880000000       8288.140000000
+13               5610.170000000       8288.140000000
+14               6508.470000000       6542.370000000
+15               5966.100000000       6508.470000000
+16               5406.780000000       6474.580000000
+17               5322.030000000       5677.970000000
+18               5355.930000000       5050.850000000
+19               5372.880000000       4474.580000000
+20               4355.930000000       3644.070000000
+21               4406.780000000       2711.860000000
+22               4406.780000000       2152.540000000
+23               3389.830000000       3593.220000000
+24               3423.730000000       5186.440000000
+25               3440.680000000       6406.780000000
+26               4118.640000000       6440.680000000
+27               4728.810000000       6474.580000000
+28               2474.580000000       3559.320000000
+29               1254.240000000       3559.320000000
+30               1237.290000000       5796.610000000
+31               1186.440000000       6389.830000000
+32               2440.680000000       6440.680000000
+1                6355.930000000       2355.930000000
+
+[VERTICES]
+;Link      X-Coord    Y-Coord   
+
+[LABELS]
+
+[BACKDROP]
+DIMENSIONS    0.00    0.00    10000.00    10000.00
+UNITS    NONE
+OFFSET    0.00    0.00
+
+[END]

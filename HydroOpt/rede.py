@@ -1,6 +1,7 @@
 import wntr
 import os
 import tempfile
+import copy
 
 
 class Rede:
@@ -20,6 +21,9 @@ class Rede:
                                         Se "hanoiFIM" ou "hanoiFIM.inp", carrega o
                                         arquivo de exemplo empacotado.
         """
+        self._arquivo_original = None  # Armazenar o caminho para resets futuros
+        self._copia_rede = None  # Cópia da rede para resets rápidos
+        
         if arquivo_inp is None:
             print("Nenhum arquivo fornecido. Gerando rede de teste aleatória...")
             self.wn = self._gerar_rede_teste()
@@ -40,9 +44,15 @@ class Rede:
             if not caminho_resolvido or not os.path.exists(caminho_resolvido):
                 raise FileNotFoundError(f"Arquivo não encontrado: {arquivo_inp}")
             
+            # Armazenar caminho original para resets
+            self._arquivo_original = caminho_resolvido
+            
             print(f"Carregando rede do arquivo: {caminho_resolvido}")
             self.wn = wntr.network.WaterNetworkModel(caminho_resolvido)
             self.nome = os.path.basename(caminho_resolvido).replace('.inp', '')
+        
+        # Criar cópia da rede para resets rápidos (sem recarregar do disco)
+        self._copia_rede = copy.deepcopy(self.wn)
         
         self.resultados = None
         print(f"Rede '{self.nome}' carregada com sucesso!")

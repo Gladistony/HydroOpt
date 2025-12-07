@@ -131,75 +131,149 @@ class Otimizador:
     # Avaliação de solução / objetivo
     # ------------------------------------------------------------------
     def _penalidade_base(self):
-        """Retorna penalidade base derivada dos diâmetros (se fornecidos)."""
+        """Retorna penalidade base muito alta para forçar respeito às restrições."""
         if self.diametros is not None:
             try:
-                return self.diametros.obter_penalidade()
+                # Multiplica por 1e6 para ter penalidade de bilhões quando violado
+                return self.diametros.obter_penalidade() * 1e6
             except Exception:
-                return 1e5
-        return 1e5
+                return 1e9
+        return 1e9
 
-    def _avaliar_rede(self, solution=None):
+    def _resetar_rede(self):
         """
-        Simula a rede e calcula custo com penalidade se pressão mínima < desejada.
+        Reseta a rede para os diâmetros padrão originais.
+        Necessário a cada iteração para começar com estado limpo.
+        
+        Usa uma cópia em memória da rede (rápido) em vez de recarregar do disco.
+        """
+        import copy
+        
+        # Se a rede tem uma cópia em memória, usar dela (muito mais rápido)
+        if hasattr(self.rede, '_copia_rede') and self.rede._copia_rede is not None:
+            self.rede.wn = copy.deepcopy(self.rede._copia_rede)
+        # Fallback: recarregar do arquivo original (mais lento)
+        elif hasattr(self.rede, '_arquivo_original') and self.rede._arquivo_original:
+            import wntr
+            self.rede.wn = wntr.network.WaterNetworkModel(self.rede._arquivo_original)
+    
+    def _atualizar_diametros_rede(self, solution):
+        """
+        Atualiza os diâmetros da rede baseado na solução (valores [0,1]).
         
         Args:
             solution (list): Lista de valores [0,1] para mapear aos diâmetros disponíveis.
-                           Se None, usa os diâmetros atuais da rede.
         
         Returns:
-            float: Custo total (custo dos diâmetros + penalidade de pressão)
+            float: Custo total dos diâmetros aplicados
         """
-        rede_worker = self.rede
+        custo_diametros = 0.0
+        
+        if solution is None or self.diametros is None:
+            return custo_diametros
+        
+        diametros_disponiveis = self.diametros.obter_diametros()
+        
+        # Mapear valores [0,1] para índices de diâmetros
+        for i, pipe_name in enumerate(self.rede.wn.pipe_name_list):
+            if i < len(solution):
+                # Converter valor [0,1] para índice de diâmetro
+                idx = int(solution[i] * (len(diametros_disponiveis) - 1))
+                idx = min(max(0, idx), len(diametros_disponiveis) - 1)
+                
+                diametro_escolhido = diametros_disponiveis[idx]
+                pipe = self.rede.wn.get_link(pipe_name)
+                
+                # Verificação de segurança
+                if type(pipe).__name__ != 'Pipe':
+                    continue
+                
+                pipe.diameter = diametro_escolhido
+                custo_diametros += self.diametros.obter_valor(diametro_escolhido) * pipe.length
+        
+        return custo_diametros
+    
+    def _calcular_erro_quadrado(self, pressoes_reais):
+        """
+        Calcula erro quadrado médio da pressão em relação à pressão desejada.
+        Quanto mais longe da pressão desejada, maior o erro.
+        
+        Args:
+            pressoes_reais (pandas.Series): Pressões dos nós de junção
+        
+        Returns:
+            float: Erro quadrado médio normalizado
+        """
+        import numpy as np
+        
+        if pressoes_reais is None or len(pressoes_reais) == 0:
+            return float('inf')
+        
+        # Calcular erro quadrado para cada nó
+        erros_quadrados = (pressoes_reais - self.pressao_min_desejada) ** 2
+        
+        # Retornar média dos erros quadrados
+        return np.mean(erros_quadrados)
+    
+    def _avaliar_rede(self, solution=None):
+        """
+        Simula a rede e calcula custo com penalidade.
+        Usa uma mistura de: custo dos diâmetros + erro quadrado + penalidade de pressão.
+        
+        Args:
+            solution (list): Lista de valores [0,1] para mapear aos diâmetros disponíveis.
+        
+        Returns:
+            float: Custo total (custo dos diâmetros + erro quadrado + penalidade de pressão)
+        """
         penalidade_base = self._penalidade_base()
         
+        # IMPORTANTE: Resetar a rede a cada iteração para garantir estado limpo
+        self._resetar_rede()
+        
         # Aplicar diâmetros da solução aos tubos
-        custo_diametros = 0.0
-        if solution is not None and self.diametros is not None:
-            diametros_disponiveis = self.diametros.obter_diametros()
-            n_tubos = len(rede_worker.wn.pipe_name_list)
-            
-            # Mapear valores [0,1] para índices de diâmetros
-            # IMPORTANTE: pipe_name_list retorna apenas PIPES (tubulações),
-            # excluindo reservatórios, tanques, bombas e válvulas
-            for i, pipe_name in enumerate(rede_worker.wn.pipe_name_list):
-                if i < len(solution):
-                    # Converter valor [0,1] para índice de diâmetro
-                    idx = int(solution[i] * (len(diametros_disponiveis) - 1))
-                    idx = min(max(0, idx), len(diametros_disponiveis) - 1)
-                    
-                    diametro_escolhido = diametros_disponiveis[idx]
-                    pipe = rede_worker.wn.get_link(pipe_name)  # Busca como LINK (pipe)
-                    
-                    # Verificação de segurança: garantir que é realmente um Pipe
-                    if type(pipe).__name__ != 'Pipe':
-                        continue  # Pula se não for pipe (segurança extra)
-                    
-                    pipe.diameter = diametro_escolhido
-                    
-                    # Somar custo deste diâmetro
-                    custo_diametros += self.diametros.obter_valor(diametro_escolhido) * pipe.length
+        custo_diametros = self._atualizar_diametros_rede(solution)
         
         # Simular rede com novos diâmetros
-        resultado = rede_worker.simular()
+        resultado = self.rede.simular()
 
         if not resultado.get('sucesso', False):
             return penalidade_base + custo_diametros
 
-        pressao_info = rede_worker.obter_pressao_minima(excluir_reservatorios=True)
+        # Obter pressões reais
+        pressao_info = self.rede.obter_pressao_minima(excluir_reservatorios=True)
         pressao_min = pressao_info['valor']
         
         # Se pressão é inválida (inf ou nan), retornar penalidade máxima
         if pressao_min == float('inf') or pressao_min != pressao_min:  # NaN check
             return penalidade_base + custo_diametros
 
-        # Penalidade se pressão mínima não atende ao requisito
-        if pressao_min < self.pressao_min_desejada:
-            penalidade_pressao = penalidade_base * (self.pressao_min_desejada - pressao_min + 1)
-            return custo_diametros + penalidade_pressao
+        # Calcular erro quadrado das pressões
+        pressoes_node = self.rede.obter_pressoes()
+        if pressoes_node is not None and not pressoes_node.empty:
+            nos_juncao = self.rede.wn.junction_name_list
+            pressoes_juncao = pressoes_node[nos_juncao].iloc[0]  # Primeira linha (tempo 0)
+            erro_quadrado = self._calcular_erro_quadrado(pressoes_juncao)
+        else:
+            erro_quadrado = 0.0
 
-        # Retornar apenas custo dos diâmetros se atende pressão
-        return custo_diametros
+        # Penalidade se pressão mínima não atende ao requisito
+        penalidade_pressao = 0.0
+        if pressao_min < self.pressao_min_desejada:
+            # Penalidade muito agressiva: quanto maior a deficiência, maior a penalidade
+            deficiencia = self.pressao_min_desejada - pressao_min
+            penalidade_pressao = penalidade_base * (deficiencia ** 2)
+
+        # Função objetivo: mistura de custo (60%) + erro quadrado (40%)
+        # Ambos penalizados se pressão for insuficiente
+        peso_custo = 0.6
+        peso_erro = 0.4
+        
+        custo_final = (peso_custo * custo_diametros + 
+                      peso_erro * erro_quadrado + 
+                      penalidade_pressao)
+
+        return custo_final
 
     # ------------------------------------------------------------------
     # Gerenciamento de parâmetros de algoritmos (MealPy)
@@ -345,6 +419,50 @@ class Otimizador:
             'usar_paralelismo': self.usar_paralelismo,
             'n_workers': self.n_workers or 'auto'
         }
+    
+    def exibir_configuracao(self):
+        """
+        Exibe as configurações atuais do otimizador de forma formatada.
+        Função pública para visualizar os parâmetros.
+        """
+        info = self.obter_informacoes()
+        
+        print("\n" + "="*70)
+        print("CONFIGURAÇÃO ATUAL DO OTIMIZADOR")
+        print("="*70)
+        print(f"\n📊 Rede Hidráulica:")
+        print(f"    Nome: {info['rede']}")
+        print(f"    Tubos: {len(self.rede.wn.pipe_name_list)}")
+        print(f"    Nós de junção: {len(self.rede.wn.junction_name_list)}")
+        
+        print(f"\n⚙️  Parâmetros de Otimização:")
+        print(f"    Pressão mínima desejada: {info['pressao_min_desejada']} m")
+        print(f"    Épocas: {info['epoch']}")
+        print(f"    População: {info['pop_size']}")
+        print(f"    Total de avaliações: {info['epoch'] * info['pop_size']}")
+        
+        print(f"\n💻 Computação:")
+        print(f"    GPU disponível: {'Sim ✓' if info['gpu_disponivel'] else 'Não ✗'}")
+        print(f"    GPU em uso: {'Sim ✓' if info['gpu_em_uso'] else 'Não (CPU)'}")
+        print(f"    Modo: {info['modo']}")
+        print(f"    Paralelismo: {'Ativado' if info['usar_paralelismo'] else 'Desativado'}")
+        print(f"    Workers: {info['n_workers']}")
+        
+        print(f"\n📋 Algoritmos Disponíveis:")
+        metodos = self.listar_metodos()
+        print(f"    Quantidade: {len(metodos)}")
+        print(f"    Métodos: {', '.join(metodos)}")
+        
+        if self.diametros is not None:
+            print(f"\n📏 Diâmetros Configurados:")
+            diams = self.diametros.obter_diametros()
+            print(f"    Quantidade: {len(diams)} diâmetros")
+            print(f"    Intervalo: {diams[0]:.4f}m a {diams[-1]:.4f}m")
+            print(f"    Penalidade base: {self._penalidade_base():.2e}")
+        else:
+            print(f"\n⚠️  Diâmetros: Nenhum configurado")
+        
+        print("\n" + "="*70 + "\n")
 
     # ------------------------------------------------------------------
     # Execução de otimização (MealPy)
