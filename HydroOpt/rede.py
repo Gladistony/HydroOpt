@@ -183,7 +183,7 @@ class Rede:
         
         return self.resultados.node['pressure']
     
-    def obter_pressao_minima(self, excluir_reservatorios=True):
+    def obter_pressao_minima(self, excluir_reservatorios=True, verbose=False):
         """
         Retorna a pressão mínima da rede.
         
@@ -245,10 +245,11 @@ class Rede:
             'tempo': str(tempo_minimo)
         }
         
-        print(f"\nPressão mínima da rede:")
-        print(f"  - Valor: {resultado['valor']:.2f} m")
-        print(f"  - Nó: {resultado['no']}")
-        print(f"  - Tempo: {resultado['tempo']}")
+        if verbose:
+            print(f"\nPressão mínima da rede:")
+            print(f"  - Valor: {resultado['valor']:.2f} m")
+            print(f"  - Nó: {resultado['no']}")
+            print(f"  - Tempo: {resultado['tempo']}")
         
         return resultado
     

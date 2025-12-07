@@ -215,7 +215,7 @@ class Otimizador:
         # Retornar média dos erros quadrados
         return np.mean(erros_quadrados)
     
-    def _avaliar_rede(self, solution=None):
+    def _avaliar_rede(self, solution=None, verbose=False):
         """
         Simula a rede e calcula custo com penalidade.
         Usa uma mistura de: custo dos diâmetros + erro quadrado + penalidade de pressão.
@@ -241,7 +241,7 @@ class Otimizador:
             return penalidade_base + custo_diametros
 
         # Obter pressões reais
-        pressao_info = self.rede.obter_pressao_minima(excluir_reservatorios=True)
+        pressao_info = self.rede.obter_pressao_minima(excluir_reservatorios=True, verbose=verbose)
         pressao_min = pressao_info['valor']
         
         # Se pressão é inválida (inf ou nan), retornar penalidade máxima
@@ -469,7 +469,7 @@ class Otimizador:
     # ------------------------------------------------------------------
     # Execução de otimização (MealPy)
     # ------------------------------------------------------------------
-    def otimizar(self, metodo='PSO'):
+    def otimizar(self, metodo='PSO', verbose=False):
         """
         Executa otimização usando MealPy com penalização de pressão mínima.
 
@@ -500,7 +500,7 @@ class Otimizador:
             
             def obj_func(self, solution):
                 """Função objetivo que simula a rede hidráulica"""
-                return [optimizer_instance._avaliar_rede(solution)]
+                return [optimizer_instance._avaliar_rede(solution, verbose=verbose)]
 
         # Problema para MealPy 3.0+: Uma variável [0,1] para cada tubo
         problem = HydroNetworkProblem(
