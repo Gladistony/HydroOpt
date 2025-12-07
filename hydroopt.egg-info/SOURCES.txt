@@ -3,7 +3,6 @@ README.md
 pyproject.toml
 setup.py
 HydroOpt/__init__.py
-HydroOpt/calculador.py
 HydroOpt/core.py
 HydroOpt/diametros.py
 HydroOpt/otimizador.py
