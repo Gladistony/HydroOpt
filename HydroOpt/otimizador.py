@@ -234,8 +234,8 @@ class Otimizador:
         # Aplicar diâmetros da solução aos tubos
         custo_diametros = self._atualizar_diametros_rede(solution)
         
-        # Simular rede com novos diâmetros
-        resultado = self.rede.simular()
+        # Simular rede com novos diâmetros (sem prints durante otimização)
+        resultado = self.rede.simular(verbose=False)
 
         if not resultado.get('sucesso', False):
             return penalidade_base + custo_diametros

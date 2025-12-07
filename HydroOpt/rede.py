@@ -107,14 +107,26 @@ class Rede:
         print(f"  - Bombas: {num_bombas}")
         print(f"  - Válvulas: {num_valvulas}")
     
-    def simular(self):
+    def simular(self, verbose=None):
         """
         Executa a simulação hidráulica da rede.
+        
+        Args:
+            verbose (bool or str, optional): Controla o nível de saída
+                - None: usa o padrão
+                - False: nenhuma saída
+                - True: apenas informações essenciais
+                - 'detalhado': saída completa (padrão original)
         
         Returns:
             dict: Dicionário com resumo dos resultados da simulação
         """
-        print(f"\nIniciando simulação da rede '{self.nome}'...")
+        # Aplicar verbose padrão se não especificado
+        if verbose is None:
+            verbose = True  # Por padrão, mostra apenas essencial (não detalhado)
+        
+        if verbose:
+            print(f"\nIniciando simulação da rede '{self.nome}'...")
         
         try:
             # Executar simulação
@@ -137,19 +149,22 @@ class Rede:
                 'nos_com_pressao_baixa': (pressoes < 20.0).any(axis=0).sum()
             }
             
-            print("\n✓ Simulação concluída com sucesso!")
-            print(f"\nResumo dos resultados:")
-            print(f"  - Pressão mínima: {resumo['pressao_minima']:.2f} m")
-            print(f"  - Pressão máxima: {resumo['pressao_maxima']:.2f} m")
-            print(f"  - Pressão média: {resumo['pressao_media']:.2f} m")
-            print(f"  - Vazão mínima: {resumo['vazao_minima']:.4f} m³/s")
-            print(f"  - Vazão máxima: {resumo['vazao_maxima']:.4f} m³/s")
-            print(f"  - Nós com pressão < 20m: {resumo['nos_com_pressao_baixa']}")
+            # Imprimir detalhes apenas se verbose='detalhado'
+            if verbose == 'detalhado':
+                print("\n✓ Simulação concluída com sucesso!")
+                print(f"\nResumo dos resultados:")
+                print(f"  - Pressão mínima: {resumo['pressao_minima']:.2f} m")
+                print(f"  - Pressão máxima: {resumo['pressao_maxima']:.2f} m")
+                print(f"  - Pressão média: {resumo['pressao_media']:.2f} m")
+                print(f"  - Vazão mínima: {resumo['vazao_minima']:.4f} m³/s")
+                print(f"  - Vazão máxima: {resumo['vazao_maxima']:.4f} m³/s")
+                print(f"  - Nós com pressão < 20m: {resumo['nos_com_pressao_baixa']}")
             
             return resumo
             
         except Exception as e:
-            print(f"\n✗ Erro durante a simulação: {str(e)}")
+            if verbose:
+                print(f"\n✗ Erro durante a simulação: {str(e)}")
             return {'sucesso': False, 'erro': str(e)}
     
     def obter_pressoes(self):
