@@ -3,5 +3,5 @@ from .rede import Rede
 from .diametros import LDiametro
 from .otimizador import Otimizador
 
-__version__ = "0.3.5"
+__version__ = "0.3.6"
 __all__ = ['Rede', 'LDiametro', 'Otimizador', 'testar_ldiametro', 'testar_rede', 'executar_todos_testes']

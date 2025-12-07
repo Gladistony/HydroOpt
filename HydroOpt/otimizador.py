@@ -604,8 +604,9 @@ class Otimizador:
         lista_diametros = self.diametros.obter_diametros()
         
         for i, tubo in enumerate(self.rede.wn.pipe_name_list):
-            # Mapear valor [0,1] para índice de diâmetro
-            indice = min(int(solucao[i] * len(lista_diametros)), len(lista_diametros) - 1)
+            # Mapear valor [0,1] para índice de diâmetro (mesma lógica usada em _atualizar_diametros_rede)
+            indice = int(solucao[i] * (len(lista_diametros) - 1))
+            indice = min(max(0, indice), len(lista_diametros) - 1)
             diametro_selecionado = lista_diametros[indice]
             diametros_dict[tubo] = diametro_selecionado
         
