@@ -139,7 +139,7 @@ class LDiametro:
         if diametro in self._diametros:
             valor = self._diametros.pop(diametro)
             print(f"Diâmetro {diametro}m (valor: {valor}) removido.")
-                self._atualizar_penalidade()
+            self._atualizar_penalidade()
             return True
         else:
             print(f"Diâmetro {diametro}m não encontrado na lista.")
@@ -206,7 +206,7 @@ class LDiametro:
         """
         self._diametros.clear()
         print("Todos os diâmetros foram removidos.")
-            self._atualizar_penalidade()
+        self._atualizar_penalidade()
     
     def atualizar_valor(self, diametro, novo_valor):
         """
@@ -229,7 +229,7 @@ class LDiametro:
         valor_antigo = self._diametros[diametro]
         self._diametros[diametro] = float(novo_valor)
         print(f"Diâmetro {diametro}m: valor atualizado de {valor_antigo} para {novo_valor}.")
-            self._atualizar_penalidade()
+        self._atualizar_penalidade()
         
         return True
     
