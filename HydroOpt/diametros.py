@@ -22,6 +22,7 @@ class LDiametro:
                                        Se None, cria uma lista vazia.
         """
         self._diametros = {}
+        self._penalidade = 1e5  # valor alto padrão
         
         if diametros is None:
             print("Lista de diâmetros criada vazia.")
@@ -34,6 +35,7 @@ class LDiametro:
                 self.adicionar(diametro, valor, forcar=False)
             
             print(f"Lista de diâmetros criada com {len(self._diametros)} diâmetros.")
+        self._atualizar_penalidade()
     
     def adicionar(self, diametro, valor, forcar=False):
         """
@@ -90,6 +92,7 @@ class LDiametro:
             print(f"✓ Diâmetro {diametro}m ({diametro*1000:.0f}mm) adicionado com valor {valor}.")
         else:
             print(f"✓ Diâmetro {diametro}m adicionado com valor {valor}.")
+            self._atualizar_penalidade()
         
         return self  # Permite encadeamento
     
@@ -136,6 +139,7 @@ class LDiametro:
         if diametro in self._diametros:
             valor = self._diametros.pop(diametro)
             print(f"Diâmetro {diametro}m (valor: {valor}) removido.")
+                self._atualizar_penalidade()
             return True
         else:
             print(f"Diâmetro {diametro}m não encontrado na lista.")
@@ -202,6 +206,7 @@ class LDiametro:
         """
         self._diametros.clear()
         print("Todos os diâmetros foram removidos.")
+            self._atualizar_penalidade()
     
     def atualizar_valor(self, diametro, novo_valor):
         """
@@ -224,6 +229,7 @@ class LDiametro:
         valor_antigo = self._diametros[diametro]
         self._diametros[diametro] = float(novo_valor)
         print(f"Diâmetro {diametro}m: valor atualizado de {valor_antigo} para {novo_valor}.")
+            self._atualizar_penalidade()
         
         return True
     
@@ -280,6 +286,7 @@ class LDiametro:
         """Permite atribuição via indexação: lista[0.2] = 100.0"""
         # Usar o método adicionar para aplicar todas as validações
         self.adicionar(diametro, valor, forcar=False)
+        self._atualizar_penalidade()
     
     @classmethod
     def criar_padrao(cls):
@@ -324,3 +331,16 @@ class LDiametro:
         
         print(f"Criando lista com {len(diametros_m)} diâmetros (convertidos de mm para m).")
         return cls(diametros_m)
+
+    # -------------------- Penalidade --------------------
+    def _atualizar_penalidade(self):
+        """Atualiza a penalidade baseada no maior valor da lista."""
+        if not self._diametros:
+            self._penalidade = 1e5
+        else:
+            maior_valor = max(self._diametros.values())
+            self._penalidade = max(1e3, maior_valor * 10)
+
+    def obter_penalidade(self):
+        """Retorna a penalidade atual calculada."""
+        return self._penalidade
