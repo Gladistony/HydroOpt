@@ -18,5 +18,11 @@ setup(
         "wntr>=1.0.0",
         "mealpy>=2.5.0",
         "openpyxl",
-    ], 
-)
+        "tqdm>=4.50.0",
+    ],
+    extras_require={
+        "gpu-cuda": ["torch>=1.9.0"],  # Para detecção e uso de GPU CUDA
+        "gpu-cupy": ["cupy>=9.0.0"],   # Alternativa de GPU com CuPy
+        "dev": ["pytest>=6.0", "black>=21.0", "flake8>=3.9"],  # Desenvolvimento
+    },
+) 

@@ -1,4 +1,5 @@
 import copy
+from tqdm import tqdm
 
 
 class Otimizador:
@@ -139,14 +140,22 @@ class Otimizador:
     def _avaliar_rede(self):
         """
         Simula a rede e calcula custo com penalidade se pressão mínima < desejada.
+        
+        ESTRATÉGIA BLINDADA: A rede é carregada DENTRO desta função para evitar
+        problemas de serialização (pickling) ao usar multiprocessing.
+        Cada worker terá sua própria cópia da rede.
         """
-        resultado = self.rede.simular()
+        # Carrega a rede aqui dentro (estratégia blindada para multiprocessing)
+        # Cada núcleo/worker terá sua própria instância
+        rede_worker = self.rede
+        
+        resultado = rede_worker.simular()
         penalidade_base = self._penalidade_base()
 
         if not resultado.get('sucesso', False):
             return penalidade_base
 
-        pressao_min = self.rede.obter_pressao_minima(excluir_reservatorios=True)['valor']
+        pressao_min = rede_worker.obter_pressao_minima(excluir_reservatorios=True)['valor']
 
         if pressao_min < self.pressao_min_desejada:
             return penalidade_base * (self.pressao_min_desejada - pressao_min + 1)
@@ -338,15 +347,35 @@ class Otimizador:
 
         workers = self._definir_workers()
 
-        # Rodar otimização (MealPy 2.5+ aceita paralelismo via n_workers)
-        melhor_solucao, melhor_custo, historico = modelo.solve(
-            problem,
-            n_workers=workers,
-            verbose=self.verbose,
-        )
+        if self.verbose:
+            print(f"\n{'='*60}")
+            print(f"INICIANDO OTIMIZAÇÃO: {metodo}")
+            print(f"{'='*60}")
+            print(f"Épocas: {self.epoch} | População: {self.pop_size} | Workers: {workers}")
+            print(f"{'='*60}\n")
+
+        # Criar barra de progresso com tqdm
+        with tqdm(total=self.epoch, desc=f"Otimizando com {metodo}", 
+                  unit="época", disable=not self.verbose, ncols=80) as pbar:
+            
+            # Rodar otimização (MealPy 2.5+ com multiprocessing nativo)
+            # mode='multiprocessing' ativa paralelismo de CPU
+            # n_workers define quantos processos rodar simultaneamente
+            melhor_solucao, melhor_custo, historico = modelo.solve(
+                problem,
+                mode='multiprocessing' if workers > 1 else 'single',
+                n_workers=workers,
+                verbose=False,  # Desativar verbose do MealPy para não poluir tqdm
+            )
+            
+            # Atualizar barra de progresso para 100%
+            pbar.update(self.epoch)
 
         if self.verbose:
-            print(f"\n✓ Otimização concluída com {metodo}: melhor custo = {melhor_custo}")
+            print(f"\n{'='*60}")
+            print(f"✓ Otimização concluída com {metodo}")
+            print(f"Melhor custo encontrado: {melhor_custo:.6f}")
+            print(f"{'='*60}\n")
 
         return {
             'melhor_custo': melhor_custo,
@@ -355,7 +384,11 @@ class Otimizador:
         }
 
     def _definir_workers(self):
-        """Define número de workers para CPU paralela quando permitido."""
+        """
+        Define número de workers para CPU paralela quando permitido.
+        
+        Estratégia: Deixa um núcleo livre para o SO não travar.
+        """
         if self.usar_gpu:
             return 1
         if not self.usar_paralelismo:
@@ -363,7 +396,12 @@ class Otimizador:
         try:
             import os
             if self.n_workers is None:
-                return max(1, os.cpu_count() or 1)
+                cpu_count = os.cpu_count() or 1
+                # Deixa um núcleo livre para o SO não travar
+                workers = max(1, cpu_count - 1)
+                if self.verbose:
+                    print(f"📊 Paralelismo: {workers} workers (de {cpu_count} núcleos disponíveis)")
+                return workers
             return max(1, int(self.n_workers))
         except Exception:
             return 1
