@@ -1,7 +1,13 @@
 import copy
+import logging
 from tqdm import tqdm
 from mealpy.utils.space import FloatVar
 from mealpy.utils.problem import Problem
+
+# Suprimir warnings do WNTR durante otimização
+logging.getLogger("wntr").setLevel(logging.ERROR)
+logging.getLogger("wntr.epanet.io").setLevel(logging.ERROR)
+logging.getLogger("wntr.epanet.toolkit").setLevel(logging.ERROR)
 
 
 class Otimizador:
@@ -550,6 +556,75 @@ class Otimizador:
             'melhor_solucao': melhor_solucao,
             'historico': [melhor_custo],  # MealPy 3.0 não retorna histórico
         }
+
+    def aplicar_solucao(self, solucao, simular=True):
+        """
+        Aplica uma solução otimizada à rede e opcionalmente simula.
+        
+        Args:
+            solucao (list): Array de valores [0,1] dos diâmetros (saída de otimizar())
+            simular (bool): Se True, executa simulação e retorna dados da rede
+        
+        Returns:
+            dict: {
+                'diametros': dict com diâmetro de cada tubo,
+                'custo_total': custo da solução,
+                'resultado_simulacao': dados da simulação (se simular=True),
+                'pressoes': DataFrame com pressões de cada nó (se simular=True),
+                'pressao_minima': valor mínimo de pressão (se simular=True)
+            }
+        """
+        # Resetar rede
+        self._resetar_rede()
+        
+        # Aplicar diâmetros
+        custo = self._atualizar_diametros_rede(solucao)
+        
+        # Extrair diâmetros de cada tubo
+        diametros_dict = {}
+        lista_diametros = self.diametros.obter_diametros()
+        
+        for i, tubo in enumerate(self.rede.wn.pipe_name_list):
+            # Mapear valor [0,1] para índice de diâmetro
+            indice = min(int(solucao[i] * len(lista_diametros)), len(lista_diametros) - 1)
+            diametro_selecionado = lista_diametros[indice]
+            diametros_dict[tubo] = diametro_selecionado
+        
+        resultado = {
+            'diametros': diametros_dict,
+            'custo_total': custo,
+        }
+        
+        # Simular se solicitado
+        if simular:
+            resultado_sim = self.rede.simular(verbose='detalhado')
+            resultado['resultado_simulacao'] = resultado_sim
+            resultado['pressoes'] = self.rede.obter_pressoes()
+            
+            pressao_info = self.rede.obter_pressao_minima(excluir_reservatorios=True)
+            resultado['pressao_minima'] = pressao_info['valor']
+            resultado['no_pressao_minima'] = pressao_info['no']
+        
+        return resultado
+    
+    def exibir_diametros(self, diametros_dict):
+        """
+        Exibe os diâmetros de forma formatada.
+        
+        Args:
+            diametros_dict (dict): Dicionário {tubo: diametro}
+        """
+        print("\n" + "="*70)
+        print("DIÂMETROS DA SOLUÇÃO OTIMIZADA")
+        print("="*70)
+        print(f"{'Tubo':<20} {'Diâmetro (m)':<15} {'Diâmetro (mm)':<15}")
+        print("-"*70)
+        
+        for tubo, diametro in sorted(diametros_dict.items()):
+            diametro_mm = diametro * 1000
+            print(f"{tubo:<20} {diametro:<15.6f} {diametro_mm:<15.2f}")
+        
+        print("="*70 + "\n")
 
     def _definir_workers(self):
         """

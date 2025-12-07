@@ -402,3 +402,74 @@ class Rede:
         print(f"  Comprimento total: {df_tubos['Comprimento (m)'].sum():.2f} m")
         
         print("\n" + "="*80 + "\n")
+    
+    def criar_copia_com_diametros(self, diametros_dict, nome_copia=None):
+        """
+        Cria uma NOVA REDE com os diâmetros personalizados.
+        
+        Args:
+            diametros_dict (dict): Dicionário {nome_tubo: diametro_em_metros}
+                                   Exemplo: {'Pipe-1': 0.05, 'Pipe-2': 0.10}
+            nome_copia (str, optional): Nome para a nova rede. 
+                                        Se None, usa nome_original_otimizada
+        
+        Returns:
+            Rede: Nova instância de Rede com os diâmetros aplicados
+        
+        Exemplo:
+            >>> rede_original = Rede('hanoiFIM')
+            >>> dados = otimizador.aplicar_solucao(solucao)
+            >>> rede_otimizada = rede_original.criar_copia_com_diametros(
+            ...     dados['diametros'], 
+            ...     nome_copia='hanoiFIM_otimizada'
+            ... )
+            >>> rede_otimizada.simular()
+        """
+        # Criar cópia profunda da rede atual
+        rede_nova = Rede.__new__(Rede)
+        rede_nova.wn = copy.deepcopy(self.wn)
+        rede_nova._arquivo_original = self._arquivo_original
+        rede_nova._copia_rede = copy.deepcopy(rede_nova.wn)
+        rede_nova.resultados = None
+        
+        # Definir nome
+        if nome_copia is None:
+            rede_nova.nome = f"{self.nome}_otimizada"
+        else:
+            rede_nova.nome = nome_copia
+        
+        # Aplicar diâmetros
+        print(f"\nAplicando diâmetros otimizados à rede '{rede_nova.nome}'...")
+        diametros_aplicados = 0
+        diametros_nao_encontrados = []
+        
+        for tubo, novo_diametro in diametros_dict.items():
+            try:
+                # Validar diâmetro
+                if not isinstance(novo_diametro, (int, float)) or novo_diametro <= 0:
+                    raise ValueError(f"Diâmetro inválido para {tubo}: {novo_diametro}")
+                
+                # Obter o pipe (tubo)
+                if tubo not in rede_nova.wn.pipe_name_list:
+                    diametros_nao_encontrados.append(tubo)
+                    continue
+                
+                pipe = rede_nova.wn.get_link(tubo)
+                pipe.diameter = novo_diametro
+                diametros_aplicados += 1
+                
+            except Exception as e:
+                print(f"⚠️  Erro ao aplicar diâmetro para {tubo}: {e}")
+        
+        print(f"✓ {diametros_aplicados} diâmetros aplicados com sucesso")
+        
+        if diametros_nao_encontrados:
+            print(f"⚠️  {len(diametros_nao_encontrados)} tubos não encontrados na rede")
+            print(f"   (Talvez nomes diferentes: {diametros_nao_encontrados[:3]}...)")
+        
+        # Atualizar cópia
+        rede_nova._copia_rede = copy.deepcopy(rede_nova.wn)
+        
+        print(f"✓ Rede '{rede_nova.nome}' criada com sucesso!")
+        
+        return rede_nova
