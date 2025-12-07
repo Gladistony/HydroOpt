@@ -260,9 +260,11 @@ class Otimizador:
         # Penalidade se pressão mínima não atende ao requisito
         penalidade_pressao = 0.0
         if pressao_min < self.pressao_min_desejada:
-            # Penalidade muito agressiva: quanto maior a deficiência, maior a penalidade
             deficiencia = self.pressao_min_desejada - pressao_min
-            penalidade_pressao = penalidade_base * (deficiencia ** 2)
+            
+            # Mistura: Penalidade Fixa (punição) + Linear (direção) + Quadrática (severidade)
+            # Isso cria uma "rampa" suave para o lobo subir em direção à solução viável
+            penalidade_pressao = 1e5 + (1e6 * deficiencia) + (1e7 * (deficiencia ** 2))
 
         # Função objetivo: mistura de custo (60%) + erro quadrado (40%)
         # Ambos penalizados se pressão for insuficiente

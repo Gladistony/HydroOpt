@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="hydroopt",  
-    version="0.2.1",         
+    version="2.5.0",         
     author="Gladistony Silva Lins",
     description="Biblioteca de otimização de redes hidráulicas (EPANET) utilizando algoritmos de Inteligência de Enxame (GWO, WOA, PSO) para minimização de custos e garantia de pressão.",
     long_description=long_description,
