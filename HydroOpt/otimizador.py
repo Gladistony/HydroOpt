@@ -1,5 +1,7 @@
 import copy
 from tqdm import tqdm
+from mealpy.utils.space import FloatVar
+from mealpy.utils.problem import Problem
 
 
 class Otimizador:
@@ -155,7 +157,12 @@ class Otimizador:
         if not resultado.get('sucesso', False):
             return penalidade_base
 
-        pressao_min = rede_worker.obter_pressao_minima(excluir_reservatorios=True)['valor']
+        pressao_info = rede_worker.obter_pressao_minima(excluir_reservatorios=True)
+        pressao_min = pressao_info['valor']
+        
+        # Se pressão é inválida (inf ou nan), retornar penalidade máxima
+        if pressao_min == float('inf') or pressao_min != pressao_min:  # NaN check
+            return penalidade_base
 
         if pressao_min < self.pressao_min_desejada:
             return penalidade_base * (self.pressao_min_desejada - pressao_min + 1)
@@ -331,17 +338,23 @@ class Otimizador:
         except ImportError:
             raise ImportError("MealPy não está instalado. Adicione 'mealpy' às dependências.")
 
-        # Função objetivo ignora x (placeholder) e usa simulação da rede
-        def obj_func(x):
-            return self._avaliar_rede()
+        # Criar classe derivada de Problem para MealPy 3.0+
+        optimizer_instance = self
+        class HydroNetworkProblem(Problem):
+            """Problema de otimização de rede hidráulica para MealPy 3.0+"""
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+            
+            def obj_func(self, solution):
+                """Função objetivo que simula a rede hidráulica"""
+                return [optimizer_instance._avaliar_rede()]
 
-        # Problema genérico (variável dummy só para compatibilidade)
-        problem = {
-            'obj_func': obj_func,
-            'lb': [0],
-            'ub': [1],
-            'minmax': 'min',
-        }
+        # Problema para MealPy 3.0+
+        problem = HydroNetworkProblem(
+            bounds=[FloatVar(lb=0, ub=1)],  # Uma variável dummy
+            minmax='min',
+            log_to=None,
+        )
 
         modelo = self._instanciar_modelo(metodo, swarm_based, evolutionary_based)
 
@@ -358,15 +371,17 @@ class Otimizador:
         with tqdm(total=self.epoch, desc=f"Otimizando com {metodo}", 
                   unit="época", disable=not self.verbose, ncols=80) as pbar:
             
-            # Rodar otimização (MealPy 2.5+ com multiprocessing nativo)
-            # mode='multiprocessing' ativa paralelismo de CPU
-            # n_workers define quantos processos rodar simultaneamente
-            melhor_solucao, melhor_custo, historico = modelo.solve(
+            # Rodar otimização (MealPy 3.0+)
+            # Usar 'single' para evitar problemas de memória com WNTR em multithread/multiprocess
+            agent = modelo.solve(
                 problem,
-                mode='multiprocessing' if workers > 1 else 'single',
-                n_workers=workers,
-                verbose=False,  # Desativar verbose do MealPy para não poluir tqdm
+                mode='single',
+                n_workers=1,
             )
+            
+            # Extrair resultados do agent retornado
+            melhor_solucao = agent.solution
+            melhor_custo = agent.target.objectives[0]
             
             # Atualizar barra de progresso para 100%
             pbar.update(self.epoch)
@@ -380,7 +395,7 @@ class Otimizador:
         return {
             'melhor_custo': melhor_custo,
             'melhor_solucao': melhor_solucao,
-            'historico': historico,
+            'historico': [melhor_custo],  # MealPy 3.0 não retorna histórico
         }
 
     def _definir_workers(self):

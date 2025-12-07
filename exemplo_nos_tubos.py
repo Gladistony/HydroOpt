@@ -60,9 +60,12 @@ def exemplo_leitura_nos_e_tubos():
         else:
             pressao = None
         
+        # Reservatório pode não ter atributo elevation, usar head_timeseries ou padrão
+        cota = getattr(reservoir, 'elevation', 0.0)
+        
         dados_nos.append({
             "ID do Nó": reservoir_name,
-            "Cota (m)": reservoir.elevation,
+            "Cota (m)": cota,
             "Demanda (m³/s)": 0.0,
             "Pressão (mca)": round(pressao, 2) if pressao else None
         })
@@ -131,58 +134,8 @@ def exemplo_leitura_nos_e_tubos():
     return df_nos, df_tubos
 
 
-def exemplo_exportar_dados(df_nos, df_tubos):
-    """Exporta os dados para arquivos CSV"""
-    print("="*70)
-    print("EXPORTANDO DADOS PARA CSV")
-    print("="*70)
-    
-    arquivo_nos = "/tmp/nos.csv"
-    arquivo_tubos = "/tmp/tubos.csv"
-    
-    df_nos.to_csv(arquivo_nos, index=False)
-    df_tubos.to_csv(arquivo_tubos, index=False)
-    
-    print(f"\n✓ Dados dos nós exportados para: {arquivo_nos}")
-    print(f"✓ Dados dos tubos exportados para: {arquivo_tubos}")
-    
-    print("\nConteúdo de nos.csv:")
-    print(df_nos.head(10).to_string(index=False))
-    
-    print("\nConteúdo de tubos.csv:")
-    print(df_tubos.head(10).to_string(index=False))
-
-
-def exemplo_filtrar_dados(df_nos, df_tubos):
-    """Exemplos de filtragem e análise dos dados"""
-    print("\n" + "="*70)
-    print("EXEMPLOS DE FILTRAGEM DE DADOS")
-    print("="*70)
-    
-    # Nós com pressão baixa
-    print("\n>>> Nós com pressão < 15 mca:")
-    nos_pressao_baixa = df_nos[df_nos['Pressão (mca)'] < 15]
-    print(nos_pressao_baixa.to_string(index=False))
-    
-    # Tubos com maior vazão
-    print("\n>>> Top 5 tubos com maior vazão:")
-    top_tubos = df_tubos.nlargest(5, 'Vazão (L/s)')
-    print(top_tubos.to_string(index=False))
-    
-    # Tubos por diâmetro
-    print("\n>>> Tubos agrupados por diâmetro:")
-    tubos_por_diametro = df_tubos.groupby('Diâmetro (mm)').size()
-    print(tubos_por_diametro)
-    
-    # Nós por faixa de pressão
-    print("\n>>> Distribuição de nós por faixa de pressão:")
-    faixas = pd.cut(df_nos['Pressão (mca)'], bins=[0, 10, 20, 30, 100], 
-                    labels=['0-10mca', '10-20mca', '20-30mca', '>30mca'])
-    print(faixas.value_counts().sort_index())
-
-
 def main():
-    """Executar todos os exemplos"""
+    """Executar o exemplo"""
     print("\n")
     print("╔" + "="*68 + "╗")
     print("║" + " LEITURA DE NÓS E TUBULAÇÕES (ADAPTADO) ".center(68) + "║")
@@ -191,12 +144,6 @@ def main():
     try:
         # Leitura principal
         df_nos, df_tubos = exemplo_leitura_nos_e_tubos()
-        
-        # Exportar dados
-        exemplo_exportar_dados(df_nos, df_tubos)
-        
-        # Análise de dados
-        exemplo_filtrar_dados(df_nos, df_tubos)
         
         print("\n" + "="*70)
         print("✓ Leitura de dados concluída com sucesso!")

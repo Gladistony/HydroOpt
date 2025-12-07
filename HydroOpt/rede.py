@@ -167,12 +167,29 @@ class Rede:
         # Obter pressões
         pressoes = self.resultados.node['pressure']
         
+        # Validar se DataFrame não está vazio
+        if pressoes.empty or pressoes.size == 0:
+            return {
+                'valor': float('inf'),
+                'no': 'N/A',
+                'tempo': 'N/A'
+            }
+        
         if excluir_reservatorios:
             # Obter lista de nós de junção (excluindo reservatórios e tanques)
             nos_juncao = self.wn.junction_name_list
             
             # Filtrar apenas nós de junção
-            pressoes = pressoes[nos_juncao]
+            if nos_juncao:
+                pressoes = pressoes[nos_juncao]
+            
+            # Validar novamente após filtro
+            if pressoes.empty or pressoes.size == 0:
+                return {
+                    'valor': float('inf'),
+                    'no': 'N/A',
+                    'tempo': 'N/A'
+                }
         
         # Encontrar o valor mínimo global
         valor_minimo = pressoes.min().min()
@@ -260,9 +277,12 @@ class Rede:
             else:
                 pressao = None
             
+            # Reservatório pode não ter elevation, usar getattr com padrão 0.0
+            cota = getattr(reservoir, 'elevation', 0.0)
+            
             dados_nos.append({
                 "ID do Nó": reservoir_name,
-                "Cota (m)": round(reservoir.elevation, 2),
+                "Cota (m)": round(cota, 2),
                 "Demanda (m³/s)": 0.0,
                 "Pressão (mca)": round(pressao, 2) if pressao is not None else None
             })
