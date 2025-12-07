@@ -5,12 +5,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="hydroopt",  
-    version="0.1.7",         
+    version="0.2.0",         
     author="Gladistony Silva Lins",
     description="Biblioteca de otimização de redes hidráulicas (EPANET) utilizando algoritmos de Inteligência de Enxame (GWO, WOA, PSO) para minimização de custos e garantia de pressão.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(),
+    include_package_data=True,
+    package_data={"HydroOpt": ["redes/*.inp"]},
     python_requires='>=3.6',
     install_requires=[
         "numpy>=1.20.0,<2.0.0",

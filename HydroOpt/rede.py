@@ -17,18 +17,32 @@ class Rede:
         Args:
             arquivo_inp (str, optional): Caminho para o arquivo .inp da rede EPANET.
                                         Se None, gera uma rede de teste aleatória.
+                                        Se "hanoiFIM" ou "hanoiFIM.inp", carrega o
+                                        arquivo de exemplo empacotado.
         """
         if arquivo_inp is None:
             print("Nenhum arquivo fornecido. Gerando rede de teste aleatória...")
             self.wn = self._gerar_rede_teste()
             self.nome = "Rede_Teste_Aleatoria"
         else:
-            if not os.path.exists(arquivo_inp):
+            caminho_resolvido = arquivo_inp
+            nome_normalizado = str(arquivo_inp).lower().replace('.inp', '')
+
+            # Mapear atalhos conhecidos para arquivos empacotados
+            if nome_normalizado == 'hanoifim':
+                base_dir = os.path.abspath(os.path.dirname(__file__))
+                candidatos = [
+                    os.path.join(base_dir, 'redes', 'hanoiFIM.inp'),  # dentro do pacote
+                    os.path.join(os.getcwd(), 'hanoiFIM.inp'),         # diretório de trabalho
+                ]
+                caminho_resolvido = next((c for c in candidatos if os.path.exists(c)), None)
+
+            if not caminho_resolvido or not os.path.exists(caminho_resolvido):
                 raise FileNotFoundError(f"Arquivo não encontrado: {arquivo_inp}")
             
-            print(f"Carregando rede do arquivo: {arquivo_inp}")
-            self.wn = wntr.network.WaterNetworkModel(arquivo_inp)
-            self.nome = os.path.basename(arquivo_inp).replace('.inp', '')
+            print(f"Carregando rede do arquivo: {caminho_resolvido}")
+            self.wn = wntr.network.WaterNetworkModel(caminho_resolvido)
+            self.nome = os.path.basename(caminho_resolvido).replace('.inp', '')
         
         self.resultados = None
         print(f"Rede '{self.nome}' carregada com sucesso!")

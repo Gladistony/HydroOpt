@@ -139,36 +139,67 @@ class Otimizador:
                 return 1e5
         return 1e5
 
-    def _avaliar_rede(self):
+    def _avaliar_rede(self, solution=None):
         """
         Simula a rede e calcula custo com penalidade se pressão mínima < desejada.
         
-        ESTRATÉGIA BLINDADA: A rede é carregada DENTRO desta função para evitar
-        problemas de serialização (pickling) ao usar multiprocessing.
-        Cada worker terá sua própria cópia da rede.
-        """
-        # Carrega a rede aqui dentro (estratégia blindada para multiprocessing)
-        # Cada núcleo/worker terá sua própria instância
-        rede_worker = self.rede
+        Args:
+            solution (list): Lista de valores [0,1] para mapear aos diâmetros disponíveis.
+                           Se None, usa os diâmetros atuais da rede.
         
-        resultado = rede_worker.simular()
+        Returns:
+            float: Custo total (custo dos diâmetros + penalidade de pressão)
+        """
+        rede_worker = self.rede
         penalidade_base = self._penalidade_base()
+        
+        # Aplicar diâmetros da solução aos tubos
+        custo_diametros = 0.0
+        if solution is not None and self.diametros is not None:
+            diametros_disponiveis = self.diametros.obter_diametros()
+            n_tubos = len(rede_worker.wn.pipe_name_list)
+            
+            # Mapear valores [0,1] para índices de diâmetros
+            # IMPORTANTE: pipe_name_list retorna apenas PIPES (tubulações),
+            # excluindo reservatórios, tanques, bombas e válvulas
+            for i, pipe_name in enumerate(rede_worker.wn.pipe_name_list):
+                if i < len(solution):
+                    # Converter valor [0,1] para índice de diâmetro
+                    idx = int(solution[i] * (len(diametros_disponiveis) - 1))
+                    idx = min(max(0, idx), len(diametros_disponiveis) - 1)
+                    
+                    diametro_escolhido = diametros_disponiveis[idx]
+                    pipe = rede_worker.wn.get_link(pipe_name)  # Busca como LINK (pipe)
+                    
+                    # Verificação de segurança: garantir que é realmente um Pipe
+                    if type(pipe).__name__ != 'Pipe':
+                        continue  # Pula se não for pipe (segurança extra)
+                    
+                    pipe.diameter = diametro_escolhido
+                    
+                    # Somar custo deste diâmetro
+                    custo_diametros += self.diametros.obter_valor(diametro_escolhido) * pipe.length
+        
+        # Simular rede com novos diâmetros
+        resultado = rede_worker.simular()
 
         if not resultado.get('sucesso', False):
-            return penalidade_base
+            return penalidade_base + custo_diametros
 
         pressao_info = rede_worker.obter_pressao_minima(excluir_reservatorios=True)
         pressao_min = pressao_info['valor']
         
         # Se pressão é inválida (inf ou nan), retornar penalidade máxima
         if pressao_min == float('inf') or pressao_min != pressao_min:  # NaN check
-            return penalidade_base
+            return penalidade_base + custo_diametros
 
+        # Penalidade se pressão mínima não atende ao requisito
         if pressao_min < self.pressao_min_desejada:
-            return penalidade_base * (self.pressao_min_desejada - pressao_min + 1)
+            penalidade_pressao = penalidade_base * (self.pressao_min_desejada - pressao_min + 1)
+            return custo_diametros + penalidade_pressao
 
-        # Custo base: 0 (placeholder). Aqui poderíamos somar custos de diâmetros etc.
-        return 0.0
+        # Retornar apenas custo dos diâmetros se atende pressão
+        return custo_diametros
 
     # ------------------------------------------------------------------
     # Gerenciamento de parâmetros de algoritmos (MealPy)
@@ -340,6 +371,8 @@ class Otimizador:
 
         # Criar classe derivada de Problem para MealPy 3.0+
         optimizer_instance = self
+        n_tubos = len(self.rede.wn.pipe_name_list)
+        
         class HydroNetworkProblem(Problem):
             """Problema de otimização de rede hidráulica para MealPy 3.0+"""
             def __init__(self, **kwargs):
@@ -347,11 +380,11 @@ class Otimizador:
             
             def obj_func(self, solution):
                 """Função objetivo que simula a rede hidráulica"""
-                return [optimizer_instance._avaliar_rede()]
+                return [optimizer_instance._avaliar_rede(solution)]
 
-        # Problema para MealPy 3.0+
+        # Problema para MealPy 3.0+: Uma variável [0,1] para cada tubo
         problem = HydroNetworkProblem(
-            bounds=[FloatVar(lb=0, ub=1)],  # Uma variável dummy
+            bounds=[FloatVar(lb=0, ub=1) for _ in range(n_tubos)],
             minmax='min',
             log_to=None,
         )

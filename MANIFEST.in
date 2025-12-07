@@ -1,3 +1,4 @@
 include README.md
 include LICENSE
 recursive-include HydroOpt *.py
+recursive-include HydroOpt/redes *.inp

@@ -94,7 +94,44 @@ class LDiametro:
             print(f"✓ Diâmetro {diametro}m adicionado com valor {valor}.")
             self._atualizar_penalidade()
         
-        return self  # Permite encadeamento
+        return self
+    
+    def adicionar_polegadas(self, diametro_polegadas, custo_por_metro):
+        """
+        Adiciona um diâmetro usando unidade em POLEGADAS.
+        
+        Converte automaticamente polegadas para metros antes de armazenar.
+        1 polegada = 25.4 mm = 0.0254 m
+        
+        Args:
+            diametro_polegadas (float): Diâmetro em POLEGADAS
+            custo_por_metro (float): Custo por metro linear de tubulação
+        
+        Returns:
+            LDiametro: Retorna self para permitir encadeamento
+            
+        Exemplo:
+            >>> lista = LDiametro()
+            >>> lista.adicionar_polegadas(12, 45.73)  # 12 polegadas
+            >>> lista.adicionar_polegadas(16, 70.41)  # 16 polegadas
+        """
+        if not isinstance(diametro_polegadas, (int, float)) or diametro_polegadas <= 0:
+            raise ValueError("O diâmetro em polegadas deve ser um número positivo.")
+        
+        if not isinstance(custo_por_metro, (int, float)) or custo_por_metro < 0:
+            raise ValueError("O custo por metro deve ser um número não-negativo.")
+        
+        # Conversão: 1 polegada = 0.0254 metros
+        diametro_metros = diametro_polegadas * 0.0254
+        diametro_mm = diametro_polegadas * 25.4
+        
+        # Adicionar com conversão já feita
+        self._diametros[float(diametro_metros)] = float(custo_por_metro)
+        
+        print(f"✓ Diâmetro {diametro_polegadas}\" ({diametro_mm:.1f}mm / {diametro_metros:.4f}m) adicionado com custo {custo_por_metro}/m.")
+        self._atualizar_penalidade()
+        
+        return self
     
     def adicionar_dicionario(self, diametros, forcar=False):
         """
