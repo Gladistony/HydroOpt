@@ -1,16 +1,21 @@
 Metadata-Version: 2.4
 Name: hydroopt
-Version: 0.0.1
-Summary: Pacote de teste de publicação
+Version: 0.1.0
+Summary: Biblioteca de otimização de redes hidráulicas (EPANET) utilizando algoritmos de Inteligência de Enxame (GWO, WOA, PSO) para minimização de custos e garantia de pressão.
 Author: Gladistony Silva Lins
 Author-email: Gladistony Silva Lins <seu-email@exemplo.com>
+License: MIT
 Project-URL: Homepage, https://github.com/Gladistony/HydroOpt
 Project-URL: Bug Tracker, https://github.com/Gladistony/HydroOpt/issues
 Classifier: Programming Language :: Python :: 3
-Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.6
 Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.20.0
+Requires-Dist: pandas>=1.3.0
+Requires-Dist: wntr>=1.0.0
+Requires-Dist: mealpy>=2.5.0
+Requires-Dist: openpyxl
 Dynamic: author
 Dynamic: requires-python
 

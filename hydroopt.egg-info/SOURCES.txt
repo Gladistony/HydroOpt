@@ -7,4 +7,5 @@ HydroOpt/core.py
 hydroopt.egg-info/PKG-INFO
 hydroopt.egg-info/SOURCES.txt
 hydroopt.egg-info/dependency_links.txt
+hydroopt.egg-info/requires.txt
 hydroopt.egg-info/top_level.txt

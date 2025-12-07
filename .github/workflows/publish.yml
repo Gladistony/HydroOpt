@@ -1,12 +1,16 @@
 name: Publish Python Package
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'  # Executa quando criar tags como v0.1.0, v1.0.0, etc.
   release:
     types: [published]
   workflow_dispatch:
 
 permissions:
   contents: read
+  id-token: write  # Necessário para Trusted Publishers
 
 jobs:
   deploy:
@@ -31,5 +35,4 @@ jobs:
     - name: Publish package to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
-        user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
