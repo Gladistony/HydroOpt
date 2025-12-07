@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hydroopt"
-version = "0.3.0"
+version = "0.3.5"
 authors = [
     {name = "Gladistony Silva Lins", email = "seu-email@exemplo.com"}
 ]
@@ -23,6 +23,8 @@ dependencies = [
     "mealpy>=3.0.0",
     "openpyxl",
     "tqdm>=4.50.0",
+    "matplotlib>=3.3.0",
+    "Pillow>=8.0.0",
 ]
 
 [project.urls]

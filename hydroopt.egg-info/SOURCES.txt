@@ -7,6 +7,8 @@ HydroOpt/core.py
 HydroOpt/diametros.py
 HydroOpt/otimizador.py
 HydroOpt/rede.py
+HydroOpt/visualizador.py
+HydroOpt/redes/__init__.py
 HydroOpt/redes/hanoiFIM.inp
 hydroopt.egg-info/PKG-INFO
 hydroopt.egg-info/SOURCES.txt

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hydroopt
-Version: 0.3.0
+Version: 0.3.5
 Summary: Biblioteca de otimização de redes hidráulicas (EPANET) utilizando algoritmos de Inteligência de Enxame (GWO, WOA, PSO) para minimização de custos e garantia de pressão.
 Author: Gladistony Silva Lins
 Author-email: Gladistony Silva Lins <seu-email@exemplo.com>
@@ -17,6 +17,8 @@ Requires-Dist: wntr>=1.0.0
 Requires-Dist: mealpy>=3.0.0
 Requires-Dist: openpyxl
 Requires-Dist: tqdm>=4.50.0
+Requires-Dist: matplotlib>=3.3.0
+Requires-Dist: Pillow>=8.0.0
 Dynamic: author
 Dynamic: requires-python
 

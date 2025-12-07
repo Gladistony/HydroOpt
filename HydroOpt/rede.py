@@ -183,7 +183,7 @@ class Rede:
         
         return self.resultados.node['pressure']
     
-    def obter_pressao_minima(self, excluir_reservatorios=True, verbose=False):
+    def obter_pressao_minima(self, excluir_reservatorios=True, verbose=True):
         """
         Retorna a pressão mínima da rede.
         

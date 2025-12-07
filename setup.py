@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="hydroopt",  
-    version="0.3.0",         
+    version="0.3.5",         
     author="Gladistony Silva Lins",
     description="Biblioteca de otimização de redes hidráulicas (EPANET) utilizando algoritmos de Inteligência de Enxame (GWO, WOA, PSO) para minimização de custos e garantia de pressão.",
     long_description=long_description,
@@ -21,6 +21,8 @@ setup(
         "mealpy>=3.0.0",
         "openpyxl",
         "tqdm>=4.50.0",
+        "matplotlib>=3.3.0",
+        "Pillow>=8.0.0",
     ],
     extras_require={
         "gpu-cuda": ["torch>=1.9.0"],  # Para detecção e uso de GPU CUDA

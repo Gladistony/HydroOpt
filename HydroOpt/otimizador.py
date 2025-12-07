@@ -498,15 +498,32 @@ class Otimizador:
         # Criar classe derivada de Problem para MealPy 3.0+
         optimizer_instance = self
         n_tubos = len(self.rede.wn.pipe_name_list)
-        
+
+        # Estimar total de avaliações (épocas * população)
+        total_evals = max(1, int(self.epoch) * int(self.pop_size))
+
         class HydroNetworkProblem(Problem):
             """Problema de otimização de rede hidráulica para MealPy 3.0+"""
             def __init__(self, **kwargs):
                 super().__init__(**kwargs)
             
             def obj_func(self, solution):
-                """Função objetivo que simula a rede hidráulica"""
-                return [optimizer_instance._avaliar_rede(solution, verbose=verbose)]
+                """Função objetivo que simula a rede hidráulica
+
+                Atualiza a barra de progresso por avaliação (1 avaliação = 1 chamada).
+                """
+                value = optimizer_instance._avaliar_rede(solution, verbose=verbose)
+
+                # Atualizar barra de progresso se estiver definida
+                try:
+                    pbar = getattr(optimizer_instance, '_pbar', None)
+                    if pbar is not None:
+                        pbar.update(1)
+                except Exception:
+                    # Não queremos interromper a avaliação por um erro de UI
+                    pass
+
+                return [value]
 
         # Problema para MealPy 3.0+: Uma variável [0,1] para cada tubo
         problem = HydroNetworkProblem(
@@ -526,10 +543,12 @@ class Otimizador:
             print(f"Épocas: {self.epoch} | População: {self.pop_size} | Workers: {workers}")
             print(f"{'='*60}\n")
 
-        # Criar barra de progresso com tqdm
-        with tqdm(total=self.epoch, desc=f"Otimizando com {metodo}", 
-                  unit="época", disable=not self.verbose, ncols=80) as pbar:
-            
+        # Criar barra de progresso com tqdm (conta avaliações: épocas * população)
+        with tqdm(total=total_evals, desc=f"Otimizando com {metodo}", 
+                  unit="avaliação", disable=not self.verbose, ncols=80) as pbar:
+            # Expor a barra para o obj_func via instância do otimizador
+            optimizer_instance._pbar = pbar
+
             # Rodar otimização (MealPy 3.0+)
             # Usar 'single' para evitar problemas de memória com WNTR em multithread/multiprocess
             agent = modelo.solve(
@@ -542,8 +561,8 @@ class Otimizador:
             melhor_solucao = agent.solution
             melhor_custo = agent.target.objectives[0]
             
-            # Atualizar barra de progresso para 100%
-            pbar.update(self.epoch)
+            # Remover referência à barra
+            optimizer_instance._pbar = None
 
         if self.verbose:
             print(f"\n{'='*60}")
