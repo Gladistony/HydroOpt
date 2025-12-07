@@ -210,3 +210,135 @@ class Rede:
         self.wn.write_inpfile(caminho_saida)
         print(f"\nRede salva em: {caminho_saida}")
         return caminho_saida
+    
+    def obter_nos_e_tubos(self):
+        """
+        Retorna DataFrames com informações detalhadas dos nós e tubulações.
+        
+        Returns:
+            tuple: (df_nos, df_tubos) - DataFrames com pandas
+                  df_nos: ID, Cota, Demanda, Pressão
+                  df_tubos: ID, De, Para, Comprimento, Diâmetro, Vazão
+        
+        Raises:
+            ValueError: Se a simulação ainda não foi executada
+        """
+        import pandas as pd
+        
+        if self.resultados is None:
+            raise ValueError("A simulação deve ser executada antes. Execute rede.simular() primeiro.")
+        
+        # ==============================================================
+        # PARTE A: Nós (Pressão)
+        # ==============================================================
+        
+        dados_nos = []
+        
+        # Iterar sobre todas as junctions
+        for node_name in self.wn.junction_name_list:
+            node = self.wn.get_node(node_name)
+            
+            # Obter a pressão do nó (média ao longo do tempo)
+            if node_name in self.resultados.node['pressure'].columns:
+                pressao = self.resultados.node['pressure'][node_name].mean()
+            else:
+                pressao = None
+            
+            dados_nos.append({
+                "ID do Nó": node_name,
+                "Cota (m)": round(node.elevation, 2),
+                "Demanda (m³/s)": round(node.base_demand, 4),
+                "Pressão (mca)": round(pressao, 2) if pressao is not None else None
+            })
+        
+        # Adicionar reservatórios
+        for reservoir_name in self.wn.reservoir_name_list:
+            reservoir = self.wn.get_node(reservoir_name)
+            
+            if reservoir_name in self.resultados.node['pressure'].columns:
+                pressao = self.resultados.node['pressure'][reservoir_name].mean()
+            else:
+                pressao = None
+            
+            dados_nos.append({
+                "ID do Nó": reservoir_name,
+                "Cota (m)": round(reservoir.elevation, 2),
+                "Demanda (m³/s)": 0.0,
+                "Pressão (mca)": round(pressao, 2) if pressao is not None else None
+            })
+        
+        df_nos = pd.DataFrame(dados_nos)
+        
+        # ==============================================================
+        # PARTE B: Tubulações (Vazão)
+        # ==============================================================
+        
+        dados_tubos = []
+        
+        # Iterar sobre todas as tubulações
+        for pipe_name in self.wn.pipe_name_list:
+            pipe = self.wn.get_link(pipe_name)
+            
+            # Obter a vazão (média ao longo do tempo)
+            if pipe_name in self.resultados.link['flowrate'].columns:
+                vazao_m3_s = self.resultados.link['flowrate'][pipe_name].mean()
+                vazao_l_s = vazao_m3_s * 1000  # Converter m³/s para L/s
+            else:
+                vazao_l_s = None
+            
+            dados_tubos.append({
+                "ID Tubo": pipe_name,
+                "De (Nó)": pipe.start_node,
+                "Para (Nó)": pipe.end_node,
+                "Comprimento (m)": round(pipe.length, 2),
+                "Diâmetro (mm)": round(pipe.diameter * 1000, 2),
+                "Vazão (L/s)": round(vazao_l_s, 2) if vazao_l_s is not None else None
+            })
+        
+        df_tubos = pd.DataFrame(dados_tubos)
+        
+        return df_nos, df_tubos
+    
+    def exibir_nos_e_tubos(self):
+        """
+        Exibe em formato tabular os dados dos nós e tubulações após simulação.
+        
+        Raises:
+            ValueError: Se a simulação ainda não foi executada
+        """
+        if self.resultados is None:
+            raise ValueError("A simulação deve ser executada antes. Execute rede.simular() primeiro.")
+        
+        df_nos, df_tubos = self.obter_nos_e_tubos()
+        
+        print("\n" + "="*80)
+        print("DADOS DOS NÓS")
+        print("="*80)
+        print(df_nos.to_string(index=False))
+        print(f"\nTotal de nós: {len(df_nos)}")
+        
+        print("\n" + "-"*80 + "\n")
+        
+        print("DADOS DAS TUBULAÇÕES")
+        print("="*80)
+        print(df_tubos.to_string(index=False))
+        print(f"\nTotal de tubulações: {len(df_tubos)}")
+        
+        # Estatísticas
+        print("\n" + "="*80)
+        print("ESTATÍSTICAS")
+        print("="*80)
+        
+        print("\nNÓS:")
+        print(f"  Pressão mínima: {df_nos['Pressão (mca)'].min():.2f} mca")
+        print(f"  Pressão máxima: {df_nos['Pressão (mca)'].max():.2f} mca")
+        print(f"  Pressão média: {df_nos['Pressão (mca)'].mean():.2f} mca")
+        print(f"  Demanda total: {df_nos['Demanda (m³/s)'].sum():.4f} m³/s ({df_nos['Demanda (m³/s)'].sum()*1000:.2f} L/s)")
+        
+        print("\nTUBULAÇÕES:")
+        print(f"  Vazão mínima: {df_tubos['Vazão (L/s)'].min():.2f} L/s")
+        print(f"  Vazão máxima: {df_tubos['Vazão (L/s)'].max():.2f} L/s")
+        print(f"  Vazão média: {df_tubos['Vazão (L/s)'].mean():.2f} L/s")
+        print(f"  Comprimento total: {df_tubos['Comprimento (m)'].sum():.2f} m")
+        
+        print("\n" + "="*80 + "\n")
