@@ -570,10 +570,12 @@ class Otimizador:
                     if self.verbose:
                         print(f"🚀 Warm Start: Gerando {self.pop_size - 1} indivíduos aleatórios a partir da guia.")
                     
-                    populacao_final = [solucao_inicial]
+                    # Converter para numpy array
+                    solucao_inicial_np = np.array(solucao_inicial, dtype=float)
+                    populacao_final = [solucao_inicial_np]
                     qtd_restante = int(self.pop_size) - 1
                     if qtd_restante > 0:
-                        aleatorios = np.random.uniform(0.0, 1.0, (qtd_restante, n_tubos)).tolist()
+                        aleatorios = np.random.uniform(0.0, 1.0, (qtd_restante, n_tubos))
                         populacao_final.extend(aleatorios)
                     
                     solve_kwargs['starting_solutions'] = populacao_final
@@ -585,8 +587,10 @@ class Otimizador:
                     
                     if self.verbose:
                         print(f"🚀 Usando população inicial personalizada ({len(solucao_inicial)} indivíduos).")
-                        
-                    solve_kwargs['starting_solutions'] = solucao_inicial
+                    
+                    # Converter todas as soluções para numpy arrays
+                    populacao_np = [np.array(sol, dtype=float) for sol in solucao_inicial]
+                    solve_kwargs['starting_solutions'] = populacao_np
 
             # Rodar otimização (MealPy 3.0+)
             # Usar 'single' para evitar problemas de memória com WNTR em multithread/multiprocess
