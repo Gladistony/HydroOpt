@@ -557,12 +557,36 @@ class Otimizador:
                 'n_workers': 1,
             }
             
-            # --- TÉCNICA WARM START ---
-            # Se uma solução inicial foi fornecida, usá-la para acelerar a convergência
+            # --- LÓGICA FLEXÍVEL DE SOLUÇÃO INICIAL ---
             if solucao_inicial is not None:
-                if self.verbose:
-                    print("🚀 Usando solução inicial (warm start)")
-                solve_kwargs['starting_solutions'] = [solucao_inicial]
+                import numpy as np
+                
+                # Verifica se é uma única solução (lista de números) ou população (lista de listas)
+                # Se o primeiro elemento for um número, é uma solução única.
+                eh_solucao_unica = isinstance(solucao_inicial[0], (int, float))
+                
+                if eh_solucao_unica:
+                    # CASO 1: Você passou só a solução guia (Warm Start Automático)
+                    if self.verbose:
+                        print(f"🚀 Warm Start: Gerando {self.pop_size - 1} indivíduos aleatórios a partir da guia.")
+                    
+                    populacao_final = [solucao_inicial]
+                    qtd_restante = int(self.pop_size) - 1
+                    if qtd_restante > 0:
+                        aleatorios = np.random.uniform(0.0, 1.0, (qtd_restante, n_tubos)).tolist()
+                        populacao_final.extend(aleatorios)
+                    
+                    solve_kwargs['starting_solutions'] = populacao_final
+                    
+                else:
+                    # CASO 2: Você passou a população inteira (Controle Total)
+                    if len(solucao_inicial) != self.pop_size:
+                        print(f"⚠️ AVISO: População inicial tem {len(solucao_inicial)} indivíduos, mas pop_size é {self.pop_size}.")
+                    
+                    if self.verbose:
+                        print(f"🚀 Usando população inicial personalizada ({len(solucao_inicial)} indivíduos).")
+                        
+                    solve_kwargs['starting_solutions'] = solucao_inicial
 
             # Rodar otimização (MealPy 3.0+)
             # Usar 'single' para evitar problemas de memória com WNTR em multithread/multiprocess
