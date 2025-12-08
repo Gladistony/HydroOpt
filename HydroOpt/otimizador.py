@@ -475,7 +475,7 @@ class Otimizador:
     # ------------------------------------------------------------------
     # Execução de otimização (MealPy)
     # ------------------------------------------------------------------
-    def otimizar(self, metodo='PSO', verbose=False):
+    def otimizar(self, metodo='PSO', verbose=False, solucao_inicial=None):
         """
         Executa otimização usando MealPy com penalização de pressão mínima.
 
@@ -543,19 +543,30 @@ class Otimizador:
             print(f"Épocas: {self.epoch} | População: {self.pop_size} | Workers: {workers}")
             print(f"{'='*60}\n")
 
+        
+
         # Criar barra de progresso com tqdm (conta avaliações: épocas * população)
         with tqdm(total=total_evals, desc=f"Otimizando com {metodo}", 
                   unit="avaliação", disable=not self.verbose, ncols=80) as pbar:
             # Expor a barra para o obj_func via instância do otimizador
             optimizer_instance._pbar = pbar
 
+            # Preparar argumentos para solve
+            solve_kwargs = {
+                'mode': 'single',
+                'n_workers': 1,
+            }
+            
+            # --- TÉCNICA WARM START ---
+            # Se uma solução inicial foi fornecida, usá-la para acelerar a convergência
+            if solucao_inicial is not None:
+                if self.verbose:
+                    print("🚀 Usando solução inicial (warm start)")
+                solve_kwargs['starting_solutions'] = [solucao_inicial]
+
             # Rodar otimização (MealPy 3.0+)
             # Usar 'single' para evitar problemas de memória com WNTR em multithread/multiprocess
-            agent = modelo.solve(
-                problem,
-                mode='single',
-                n_workers=1,
-            )
+            agent = modelo.solve(problem, **solve_kwargs)
             
             # Extrair resultados do agent retornado
             melhor_solucao = agent.solution
