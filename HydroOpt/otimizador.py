@@ -564,10 +564,19 @@ class Otimizador:
             # Remover referência à barra
             optimizer_instance._pbar = None
 
+        self._resetar_rede()
+        # Calculamos o custo financeiro puro (sem penalidades de pressão)
+        custo_real_investimento = self._atualizar_diametros_rede(melhor_solucao)
+        # -----------------------------------------------------
+
         if self.verbose:
             print(f"\n{'='*60}")
             print(f"✓ Otimização concluída com {metodo}")
-            print(f"Melhor custo encontrado: {melhor_custo:.6f}")
+            print(f"{'='*60}")
+            # Exibe o Fitness (Score matemático)
+            print(f"  🔹 Melhor Fitness (Score):   {melhor_custo:.6f}")
+            # Exibe o Dinheiro (O que importa para o engenheiro)
+            print(f"  💰 Custo Real Estimado:      R$ {custo_real_investimento:,.2f}")
             print(f"{'='*60}\n")
 
         return {
