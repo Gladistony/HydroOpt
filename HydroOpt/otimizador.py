@@ -560,37 +560,56 @@ class Otimizador:
             # --- LÓGICA FLEXÍVEL DE SOLUÇÃO INICIAL ---
             if solucao_inicial is not None:
                 import numpy as np
-                
-                # Verifica se é uma única solução (lista de números) ou população (lista de listas)
-                # Se o primeiro elemento for um número, é uma solução única.
-                eh_solucao_unica = isinstance(solucao_inicial[0], (int, float))
-                
-                if eh_solucao_unica:
-                    # CASO 1: Você passou só a solução guia (Warm Start Automático)
-                    if self.verbose:
-                        print(f"🚀 Warm Start: Gerando {self.pop_size - 1} indivíduos aleatórios a partir da guia.")
-                    
-                    # Converter para numpy array
-                    solucao_inicial_np = np.array(solucao_inicial, dtype=float)
-                    populacao_final = [solucao_inicial_np]
-                    qtd_restante = int(self.pop_size) - 1
-                    if qtd_restante > 0:
-                        aleatorios = np.random.uniform(0.0, 1.0, (qtd_restante, n_tubos))
-                        populacao_final.extend(aleatorios)
-                    
-                    solve_kwargs['starting_solutions'] = populacao_final
-                    
+
+                def _normalizar_individuo(ind):
+                    arr = np.asarray(ind, dtype=float)
+                    if arr.ndim != 1 or arr.size != n_tubos:
+                        raise ValueError("solucao_inicial deve ter comprimento igual ao número de tubos")
+                    return arr
+
+                # Detectar formato fornecido
+                if isinstance(solucao_inicial, np.ndarray):
+                    if solucao_inicial.ndim == 1:
+                        # Vetor único
+                        solucao_unica = _normalizar_individuo(solucao_inicial)
+                        populacao_final = [solucao_unica]
+                        qtd_restante = int(self.pop_size) - 1
+                        if qtd_restante > 0:
+                            aleatorios = np.random.uniform(0.0, 1.0, (qtd_restante, n_tubos))
+                            populacao_final.extend(aleatorios)
+                        if self.verbose:
+                            print(f"🚀 Warm Start: Gerando {self.pop_size - 1} indivíduos aleatórios a partir da guia.")
+                        solve_kwargs['starting_solutions'] = populacao_final
+                    elif solucao_inicial.ndim == 2:
+                        # Matriz (população completa)
+                        if solucao_inicial.shape[0] != self.pop_size:
+                            print(f"⚠️ AVISO: População inicial tem {solucao_inicial.shape[0]} indivíduos, mas pop_size é {self.pop_size}.")
+                        populacao_np = [ _normalizar_individuo(solucao_inicial[i]) for i in range(solucao_inicial.shape[0]) ]
+                        if self.verbose:
+                            print(f"🚀 Usando população inicial personalizada ({len(populacao_np)} indivíduos).")
+                        solve_kwargs['starting_solutions'] = populacao_np
+                    else:
+                        raise ValueError("solucao_inicial numpy deve ser vetor 1D ou matriz 2D")
                 else:
-                    # CASO 2: Você passou a população inteira (Controle Total)
-                    if len(solucao_inicial) != self.pop_size:
-                        print(f"⚠️ AVISO: População inicial tem {len(solucao_inicial)} indivíduos, mas pop_size é {self.pop_size}.")
-                    
-                    if self.verbose:
-                        print(f"🚀 Usando população inicial personalizada ({len(solucao_inicial)} indivíduos).")
-                    
-                    # Converter todas as soluções para numpy arrays
-                    populacao_np = [np.array(sol, dtype=float) for sol in solucao_inicial]
-                    solve_kwargs['starting_solutions'] = populacao_np
+                    # Listas/tuplas
+                    eh_solucao_unica = isinstance(solucao_inicial[0], (int, float))
+                    if eh_solucao_unica:
+                        if self.verbose:
+                            print(f"🚀 Warm Start: Gerando {self.pop_size - 1} indivíduos aleatórios a partir da guia.")
+                        solucao_unica = _normalizar_individuo(solucao_inicial)
+                        populacao_final = [solucao_unica]
+                        qtd_restante = int(self.pop_size) - 1
+                        if qtd_restante > 0:
+                            aleatorios = np.random.uniform(0.0, 1.0, (qtd_restante, n_tubos))
+                            populacao_final.extend(aleatorios)
+                        solve_kwargs['starting_solutions'] = populacao_final
+                    else:
+                        if len(solucao_inicial) != self.pop_size:
+                            print(f"⚠️ AVISO: População inicial tem {len(solucao_inicial)} indivíduos, mas pop_size é {self.pop_size}.")
+                        populacao_np = [_normalizar_individuo(sol) for sol in solucao_inicial]
+                        if self.verbose:
+                            print(f"🚀 Usando população inicial personalizada ({len(populacao_np)} indivíduos).")
+                        solve_kwargs['starting_solutions'] = populacao_np
 
             # Rodar otimização (MealPy 3.0+)
             # Usar 'single' para evitar problemas de memória com WNTR em multithread/multiprocess
