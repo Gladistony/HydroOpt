@@ -568,6 +568,10 @@ class Otimizador:
                     if arr.size == 1:
                         arr = np.full(n_tubos, float(arr[0]))
 
+                    # Sanitizar NaN/Inf e limitar a [0,1]
+                    arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
+                    arr = np.clip(arr, 0.0, 1.0)
+
                     if arr.size != n_tubos:
                         info_idx = f" (indivíduo {idx})" if idx is not None else ""
                         raise ValueError(

@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from .diametros import LDiametro
 from .rede import Rede
 import pandas as pd
@@ -41,6 +42,18 @@ def gerar_solucao_heuristica(rede, lista_diametros, pressao_min_desejada=10.0, i
         if not mudou:
             print("Limite físico atingido: todos os tubos críticos já estão no máximo.")
             break
+
+    # Converter índices atuais em solução [0,1] (mapeando opção mais barata -> 0.0, mais cara -> 1.0)
+    if num_opcoes <= 1:
+        solucao = [0.0] * num_tubos
+    else:
+        solucao = [idx / (num_opcoes - 1) for idx in indices_atuais]
+
+    # Sanitizar NaN/Inf e limitar a [0,1]
+    solucao = np.nan_to_num(np.asarray(solucao, dtype=float), nan=0.0, posinf=1.0, neginf=0.0)
+    solucao = np.clip(solucao, 0.0, 1.0)
+
+    return solucao.tolist()
 
 def testar_ldiametro():
     """
