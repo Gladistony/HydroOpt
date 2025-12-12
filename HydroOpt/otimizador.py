@@ -563,6 +563,11 @@ class Otimizador:
 
                 def _normalizar_individuo(ind, idx=None):
                     arr = np.asarray(ind, dtype=float).ravel()
+
+                    # Se veio um escalar ou vetor de tamanho 1, replicar para todos os tubos
+                    if arr.size == 1:
+                        arr = np.full(n_tubos, float(arr[0]))
+
                     if arr.size != n_tubos:
                         info_idx = f" (indivíduo {idx})" if idx is not None else ""
                         raise ValueError(
