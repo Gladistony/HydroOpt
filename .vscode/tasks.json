@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Bump version to 0.4.8 and build",
+			"type": "shell",
+			"command": "sed -i 's/version = \"[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\"/version = \"0.4.8\"/' pyproject.toml && sed -i 's/version=\"[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\"/version=\"0.4.8\"/' setup.py && sed -i 's/__version__ = \"[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\"/__version__ = \"0.4.8\"/' HydroOpt/__init__.py && rm -rf dist && python -m build",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

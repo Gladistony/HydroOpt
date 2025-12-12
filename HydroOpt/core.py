@@ -1,7 +1,46 @@
 import os
 from .diametros import LDiametro
 from .rede import Rede
+import pandas as pd
 
+def gerar_solucao_heuristica(rede, lista_diametros, pressao_min_desejada=10.0, interacao=200, verbose=False):
+    nomes_tubos = rede.wn.pipe_name_list
+    num_tubos = len(nomes_tubos)
+    diams_disponiveis = lista_diametros.obter_diametros() 
+    num_opcoes = len(diams_disponiveis)
+    indices_atuais = [0] * num_tubos
+    for i in range(interacao):
+        for idx_tubo, pipe_name in enumerate(nomes_tubos):
+            idx_diam = indices_atuais[idx_tubo]
+            diametro = diams_disponiveis[idx_diam]
+            link = rede.wn.get_link(pipe_name)
+            link.diameter = diametro
+        rede.simular(verbose=False)
+        p_info = rede.obter_pressao_minima(excluir_reservatorios=True)
+        p_min = p_info['valor']
+        if p_min >= pressao_min_desejada:
+            if verbose:
+                print(f"Solução base encontrada na iteração {i} (Pmin={p_min:.2f}m)")
+            break
+        try:
+            velocidades = rede.resultados.link['flowrate'].abs() / ((3.14159 * (pd.Series([rede.wn.get_link(n).diameter for n in rede.wn.link_name_list], index=rede.wn.link_name_list) / 2)**2))
+            if 'velocity' in rede.resultados.link:
+                 velocidades = rede.resultados.link['velocity'].abs().max()
+            tubos_criticos = velocidades.sort_values(ascending=False).index
+        except Exception as e:
+            print(f"Erro ao calcular velocidades: {e}. Parando heurística.")
+            break
+        mudou = False
+        for tubo_critico in tubos_criticos:
+            if tubo_critico in nomes_tubos:
+                idx_lista = nomes_tubos.index(tubo_critico)
+                if indices_atuais[idx_lista] < num_opcoes - 1:
+                    indices_atuais[idx_lista] += 1
+                    mudou = True
+                    break 
+        if not mudou:
+            print("Limite físico atingido: todos os tubos críticos já estão no máximo.")
+            break
 
 def testar_ldiametro():
     """
