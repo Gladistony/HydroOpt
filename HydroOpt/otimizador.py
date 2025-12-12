@@ -561,10 +561,14 @@ class Otimizador:
             if solucao_inicial is not None:
                 import numpy as np
 
-                def _normalizar_individuo(ind):
-                    arr = np.asarray(ind, dtype=float)
-                    if arr.ndim != 1 or arr.size != n_tubos:
-                        raise ValueError("solucao_inicial deve ter comprimento igual ao número de tubos")
+                def _normalizar_individuo(ind, idx=None):
+                    arr = np.asarray(ind, dtype=float).ravel()
+                    if arr.size != n_tubos:
+                        info_idx = f" (indivíduo {idx})" if idx is not None else ""
+                        raise ValueError(
+                            f"solucao_inicial{info_idx}: tamanho {arr.size}, esperado {n_tubos}. "
+                            "Forneça um valor em [0,1] para cada tubo da rede."
+                        )
                     return arr
 
                 # Detectar formato fornecido
@@ -584,7 +588,7 @@ class Otimizador:
                         # Matriz (população completa)
                         if solucao_inicial.shape[0] != self.pop_size:
                             print(f"⚠️ AVISO: População inicial tem {solucao_inicial.shape[0]} indivíduos, mas pop_size é {self.pop_size}.")
-                        populacao_np = [ _normalizar_individuo(solucao_inicial[i]) for i in range(solucao_inicial.shape[0]) ]
+                        populacao_np = [ _normalizar_individuo(solucao_inicial[i], idx=i) for i in range(solucao_inicial.shape[0]) ]
                         if self.verbose:
                             print(f"🚀 Usando população inicial personalizada ({len(populacao_np)} indivíduos).")
                         solve_kwargs['starting_solutions'] = populacao_np
@@ -606,7 +610,7 @@ class Otimizador:
                     else:
                         if len(solucao_inicial) != self.pop_size:
                             print(f"⚠️ AVISO: População inicial tem {len(solucao_inicial)} indivíduos, mas pop_size é {self.pop_size}.")
-                        populacao_np = [_normalizar_individuo(sol) for sol in solucao_inicial]
+                        populacao_np = [_normalizar_individuo(sol, idx=i) for i, sol in enumerate(solucao_inicial)]
                         if self.verbose:
                             print(f"🚀 Usando população inicial personalizada ({len(populacao_np)} indivíduos).")
                         solve_kwargs['starting_solutions'] = populacao_np

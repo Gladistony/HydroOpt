@@ -16,7 +16,7 @@ def gerar_solucao_heuristica(rede, lista_diametros, pressao_min_desejada=10.0, i
             link = rede.wn.get_link(pipe_name)
             link.diameter = diametro
         rede.simular(verbose=False)
-        p_info = rede.obter_pressao_minima(excluir_reservatorios=True)
+        p_info = rede.obter_pressao_minima(excluir_reservatorios=True, verbose= verbose)
         p_min = p_info['valor']
         if p_min >= pressao_min_desejada:
             if verbose:
