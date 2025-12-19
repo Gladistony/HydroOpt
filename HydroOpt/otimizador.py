@@ -475,15 +475,23 @@ class Otimizador:
     # ------------------------------------------------------------------
     # Execução de otimização (MealPy)
     # ------------------------------------------------------------------
-    def otimizar(self, metodo='PSO', verbose=False, solucao_inicial=None):
+    def otimizar(self, metodo='PSO', verbose=False, solucao_inicial=None, rastrear_convergencia=True):
         """
         Executa otimização usando MealPy com penalização de pressão mínima.
 
         Args:
             metodo (str): Algoritmo a usar (PSO, GWO, WOA, ABC, CS, BA, FA, HHO, DE, GA)
+            verbose (bool): Exibir informações durante otimização
+            solucao_inicial (list, optional): População ou solução inicial
+            rastrear_convergencia (bool): Rastrear histórico de convergência
 
         Returns:
-            dict: {'melhor_custo': float, 'melhor_solucao': list, 'historico': list}
+            dict: {
+                'melhor_custo': float,
+                'melhor_solucao': list,
+                'historico': list,
+                'historico_convergencia': list (melhor fitness por época, se rastrear_convergencia=True)
+            }
         """
         metodo = metodo.upper()
         if metodo not in self.parametros:
@@ -499,6 +507,11 @@ class Otimizador:
         optimizer_instance = self
         n_tubos = len(self.rede.wn.pipe_name_list)
 
+        # Inicializar rastreador de convergência
+        if rastrear_convergencia:
+            from .visualizador_convergencia import ConvergenciaTracker
+            convergencia_tracker = ConvergenciaTracker()
+        
         # Estimar total de avaliações (épocas * população)
         total_evals = max(1, int(self.epoch) * int(self.pop_size))
 
@@ -513,6 +526,10 @@ class Otimizador:
                 Atualiza a barra de progresso por avaliação (1 avaliação = 1 chamada).
                 """
                 value = optimizer_instance._avaliar_rede(solution, verbose=verbose)
+
+                # Rastrear convergência se habilitado
+                if rastrear_convergencia:
+                    convergencia_tracker.adicionar(value)
 
                 # Atualizar barra de progresso se estiver definida
                 try:
@@ -632,6 +649,10 @@ class Otimizador:
             melhor_solucao = agent.solution
             melhor_custo = agent.target.objectives[0]
             
+            # Rastrear convergência final se habilitado
+            if rastrear_convergencia:
+                convergencia_tracker.adicionar(melhor_custo)
+            
             # Remover referência à barra
             optimizer_instance._pbar = None
 
@@ -650,11 +671,17 @@ class Otimizador:
             print(f"  💰 Custo Real Estimado:      R$ {custo_real_investimento:,.2f}")
             print(f"{'='*60}\n")
 
-        return {
+        resultado = {
             'melhor_custo': melhor_custo,
             'melhor_solucao': melhor_solucao,
-            'historico': [melhor_custo],  # MealPy 3.0 não retorna histórico
+            'historico': [melhor_custo],  # MealPy 3.0 não retorna histórico completo
         }
+        
+        # Adicionar histórico de convergência se rastreado
+        if rastrear_convergencia:
+            resultado['historico_convergencia'] = convergencia_tracker.obter_historico()
+        
+        return resultado
 
     def aplicar_solucao(self, solucao, simular=True):
         """
