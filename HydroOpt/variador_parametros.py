@@ -90,8 +90,21 @@ class VariadorDeParametros:
         """
         Define as condições iniciais para as otimizações.
         
+        ⚠️  AVISO IMPORTANTE sobre população inicial:
+        
+        Se usar MESMA população_inicial para TODAS as combinações:
+        - Todas as buscas começarão do MESMO ponto no espaço
+        - Podem convergir para o MESMO local ótimo
+        - Resultados podem ser muito similares (BUG APARENTE)
+        - Útil apenas para testes reproduzíveis com seed fixo
+        
+        RECOMENDAÇÃO:
+        - Para máxima exploração: NÃO defina populacao_inicial
+        - Para reprodução exata: Use seed=valor_fixo em executar()
+        
         Args:
             populacao_inicial (list, optional): População inicial (lista de soluções)
+                ATENÇÃO: Mesma população para todas as combinações → resultados similares!
             solucao_inicial (list, optional): Uma solução inicial a ser usada
             verbose_otimizacao (bool): Se True, exibe output da otimização a cada run
         """
@@ -102,6 +115,7 @@ class VariadorDeParametros:
         if self.verbose:
             if populacao_inicial is not None:
                 print(f"✓ População inicial definida ({len(populacao_inicial)} indivíduos)")
+                print(f"  ⚠️ AVISO: Mesma população será usada em todas as {len(self._gerar_combinacoes() if hasattr(self, 'ranges_parametros') and self.ranges_parametros else [None])} combinações!")
             if solucao_inicial is not None:
                 print(f"✓ Solução inicial definida")
     
@@ -139,7 +153,7 @@ class VariadorDeParametros:
         
         return combinacoes
     
-    def executar(self, metodo='PSO', diretorio_saida=None, salvar_json=True):
+    def executar(self, metodo='PSO', diretorio_saida=None, salvar_json=True, seed=None):
         """
         Executa a varredura de parâmetros.
         
@@ -147,9 +161,31 @@ class VariadorDeParametros:
             metodo (str): Algoritmo de otimização (PSO, GWO, etc)
             diretorio_saida (str, optional): Diretório para salvar resultados
             salvar_json (bool): Se True, salva resultados em JSON
+            seed (int, optional): Seed para reprodutibilidade. Se None, não reseta seed (mais variação)
         
         Returns:
             pd.DataFrame: DataFrame com resumo de todos os resultados
+                         Incluindo nova coluna 'seed_usado' com seed de cada combinação
+        
+        IMPORTANTE:
+            - Se seed=None (padrão): Cada execução tem seu próprio seed aleatório
+              → Resultados podem variar bastante (mais exploração do espaço)
+              → seed_usado será None no DataFrame
+            
+            - Se seed=42 (ou qualquer número fixo): Reprodução exata
+              → Útil para testes, mas todos começam do mesmo ponto
+              → seed_usado será seed+i (42, 43, 44, ...) no DataFrame
+              → Permite reproduzir resultado específico usando a seed salva
+            
+            - Para melhor exploração: NÃO use populacao_inicial (deixe=None)
+        
+        RASTREAMENTO DE SEED:
+            A seed usada em cada combinação é salva na coluna 'seed_usado' do DataFrame.
+            Útil para:
+            • Reproduzir um resultado específico exato
+            • Documentar qual seed gerou qual resultado
+            • Comparar execuções com mesmas seeds
+            • Validar determinismo dos algoritmos
         """
         combinacoes = self._gerar_combinacoes()
         num_combos = len(combinacoes)
@@ -161,6 +197,10 @@ class VariadorDeParametros:
             print(f"Algoritmo: {metodo}")
             print(f"Combinações a executar: {num_combos}")
             print(f"Parâmetros variados: {list(self.ranges_parametros.keys())}")
+            if seed is not None:
+                print(f"Seed: {seed} (reprodução exata)")
+            else:
+                print(f"Seed: Aleatório (máxima exploração)")
             print(f"{'='*70}\n")
         
         self.resultados = []
@@ -174,6 +214,20 @@ class VariadorDeParametros:
         with tqdm(total=num_combos, desc="Varredura de parâmetros", 
                   disable=not self.verbose, ncols=80) as pbar:
             for i, combo in enumerate(combinacoes):
+                # **IMPORTANTE**: Resetar seed antes de cada otimização
+                # Isso garante que cada combinação tenha seu próprio espaço de busca inicial
+                if seed is not None:
+                    # Se seed foi fornecido, usar variante: seed + índice
+                    # Garante reprodução com variação entre combinações
+                    seed_usado = seed + i
+                    np.random.seed(seed_usado)
+                    # Se MealPy usa seu próprio RNG, pode ser necessário ressetar também
+                    # Por hora, numpy é o principal
+                else:
+                    # Seed aleatório - máxima exploração
+                    seed_usado = None
+                    np.random.seed(None)
+                
                 # Configurar parâmetros do otimizador
                 self.otimizador.definir_parametros(metodo, **combo)
                 
@@ -194,6 +248,7 @@ class VariadorDeParametros:
                     # Montar resultado completo
                     resultado_completo = {
                         'combinacao_id': i,
+                        'seed_usado': seed_usado,  # ← Novo: rastrear seed usada
                         'parametros': combo.copy(),
                         'melhor_custo_fitness': float(resultado_opt['melhor_custo']),
                         'custo_real': float(dados_solucao['custo_total']),
@@ -207,6 +262,7 @@ class VariadorDeParametros:
                     # Registrar falha
                     resultado_completo = {
                         'combinacao_id': i,
+                        'seed_usado': seed_usado,  # ← Novo: rastrear seed mesmo em erro
                         'parametros': combo.copy(),
                         'melhor_custo_fitness': np.nan,
                         'custo_real': np.nan,
