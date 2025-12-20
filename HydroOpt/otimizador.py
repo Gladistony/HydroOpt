@@ -658,10 +658,6 @@ class Otimizador:
             melhor_solucao = agent.solution
             melhor_custo = agent.target.objectives[0]
             
-            # Rastrear convergência final se habilitado (inclui custo real estimado)
-            if rastrear_convergencia:
-                convergencia_tracker.adicionar(melhor_custo, custo_real=custo_real_investimento)
-            
             # Remover referência à barra
             optimizer_instance._pbar = None
 
@@ -669,6 +665,10 @@ class Otimizador:
         # Calculamos o custo financeiro puro (sem penalidades de pressão)
         custo_real_investimento = self._atualizar_diametros_rede(melhor_solucao)
         # -----------------------------------------------------
+        
+        # Rastrear convergência final se habilitado (inclui custo real estimado)
+        if rastrear_convergencia:
+            convergencia_tracker.adicionar(melhor_custo, custo_real=custo_real_investimento)
 
         if self.verbose:
             print(f"\n{'='*60}")
@@ -685,11 +685,13 @@ class Otimizador:
             'melhor_solucao': melhor_solucao,
             'historico': [melhor_custo],  # MealPy 3.0 não retorna histórico completo
             'seed_usado': getattr(self, 'seed_usado', None),
+            'custo_real': custo_real_investimento,
         }
         
         # Adicionar histórico de convergência se rastreado
         if rastrear_convergencia:
             resultado['historico_convergencia'] = convergencia_tracker.obter_historico()
+            resultado['historico_custo_real'] = convergencia_tracker.obter_historico_custo_real()
         
         return resultado
 
