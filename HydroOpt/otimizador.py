@@ -239,11 +239,14 @@ class Otimizador:
         
         # Aplicar diâmetros da solução aos tubos
         custo_diametros = self._atualizar_diametros_rede(solution)
+        # Disponibilizar custo real (somente diâmetros) para o rastreador
+        self._ultimo_custo_diametros = float(custo_diametros)
         
         # Simular rede com novos diâmetros (sem prints durante otimização)
         resultado = self.rede.simular(verbose=False)
 
         if not resultado.get('sucesso', False):
+            # manter último custo real disponível
             return penalidade_base + custo_diametros
 
         # Obter pressões reais
@@ -252,6 +255,7 @@ class Otimizador:
         
         # Se pressão é inválida (inf ou nan), retornar penalidade máxima
         if pressao_min == float('inf') or pressao_min != pressao_min:  # NaN check
+            # manter último custo real disponível
             return penalidade_base + custo_diametros
 
         # Calcular erro quadrado das pressões
@@ -475,7 +479,7 @@ class Otimizador:
     # ------------------------------------------------------------------
     # Execução de otimização (MealPy)
     # ------------------------------------------------------------------
-    def otimizar(self, metodo='PSO', verbose=False, solucao_inicial=None, rastrear_convergencia=True):
+    def otimizar(self, metodo='PSO', verbose=False, solucao_inicial=None, rastrear_convergencia=True, seed=None):
         """
         Executa otimização usando MealPy com penalização de pressão mínima.
 
@@ -496,6 +500,9 @@ class Otimizador:
         metodo = metodo.upper()
         if metodo not in self.parametros:
             raise KeyError(f"Método '{metodo}' não suportado. Disponíveis: {self.listar_metodos()}")
+
+        # Configurar seed recuperável: se fornecida, usar; senão, gerar e registrar
+        self._configurar_seed_interno(seed)
 
         # Tentar importar mealpy
         try:
@@ -526,10 +533,12 @@ class Otimizador:
                 Atualiza a barra de progresso por avaliação (1 avaliação = 1 chamada).
                 """
                 value = optimizer_instance._avaliar_rede(solution, verbose=verbose)
+                # Capturar custo real dos diâmetros desta avaliação (se disponível)
+                custo_real = getattr(optimizer_instance, '_ultimo_custo_diametros', None)
 
                 # Rastrear convergência se habilitado
                 if rastrear_convergencia:
-                    convergencia_tracker.adicionar(value)
+                    convergencia_tracker.adicionar(value, custo_real=custo_real)
 
                 # Atualizar barra de progresso se estiver definida
                 try:
@@ -649,9 +658,9 @@ class Otimizador:
             melhor_solucao = agent.solution
             melhor_custo = agent.target.objectives[0]
             
-            # Rastrear convergência final se habilitado
+            # Rastrear convergência final se habilitado (inclui custo real estimado)
             if rastrear_convergencia:
-                convergencia_tracker.adicionar(melhor_custo)
+                convergencia_tracker.adicionar(melhor_custo, custo_real=custo_real_investimento)
             
             # Remover referência à barra
             optimizer_instance._pbar = None
@@ -675,6 +684,7 @@ class Otimizador:
             'melhor_custo': melhor_custo,
             'melhor_solucao': melhor_solucao,
             'historico': [melhor_custo],  # MealPy 3.0 não retorna histórico completo
+            'seed_usado': getattr(self, 'seed_usado', None),
         }
         
         # Adicionar histórico de convergência se rastreado
@@ -682,6 +692,47 @@ class Otimizador:
             resultado['historico_convergencia'] = convergencia_tracker.obter_historico()
         
         return resultado
+
+    # -------------------------
+    # Seed recuperável
+    # -------------------------
+    def configurar_seed(self, seed=None):
+        """
+        Configura a seed de forma recuperável. Se `seed` for None,
+        gera uma seed aleatória cripto-segura e registra.
+
+        Afeta o gerador global do NumPy e do Python `random`.
+
+        Args:
+            seed (int|None): Seed desejada ou None para gerar aleatória.
+
+        Returns:
+            int: Seed efetivamente usada.
+        """
+        return self._configurar_seed_interno(seed)
+
+    def _configurar_seed_interno(self, seed=None):
+        import numpy as np
+        import random
+        import secrets
+
+        # Se veio uma seed explícita, normalizar para int
+        if seed is not None:
+            try:
+                seed_int = int(seed)
+            except Exception:
+                raise ValueError("seed deve ser conversível para inteiro")
+        else:
+            # Gerar seed aleatória 32-bit cripto-segura
+            seed_int = secrets.randbits(32)
+
+        # Aplicar seed nos geradores comuns
+        np.random.seed(seed_int)
+        random.seed(seed_int)
+
+        # Registrar para recuperação
+        self.seed_usado = int(seed_int)
+        return self.seed_usado
 
     def aplicar_solucao(self, solucao, simular=True):
         """

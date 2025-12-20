@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+import secrets
 
 
 class VariadorDeParametros:
@@ -167,10 +168,10 @@ class VariadorDeParametros:
             pd.DataFrame: DataFrame com resumo de todos os resultados
                          Incluindo nova coluna 'seed_usado' com seed de cada combinação
         
-        IMPORTANTE:
-            - Se seed=None (padrão): Cada execução tem seu próprio seed aleatório
-              → Resultados podem variar bastante (mais exploração do espaço)
-              → seed_usado será None no DataFrame
+                IMPORTANTE:
+                        - Se seed=None (padrão): Cada execução terá uma seed aleatória GERADA e registrada
+                            → Resultados podem variar bastante (mais exploração do espaço)
+                            → seed_usado será um inteiro (ex.: 31415926) no DataFrame
             
             - Se seed=42 (ou qualquer número fixo): Reprodução exata
               → Útil para testes, mas todos começam do mesmo ponto
@@ -221,12 +222,22 @@ class VariadorDeParametros:
                     # Garante reprodução com variação entre combinações
                     seed_usado = seed + i
                     np.random.seed(seed_usado)
+                    try:
+                        import random
+                        random.seed(seed_usado)
+                    except Exception:
+                        pass
                     # Se MealPy usa seu próprio RNG, pode ser necessário ressetar também
                     # Por hora, numpy é o principal
                 else:
-                    # Seed aleatório - máxima exploração
-                    seed_usado = None
-                    np.random.seed(None)
+                    # Seed aleatória gerada e registrada - máxima exploração com reprodutibilidade futura
+                    seed_usado = secrets.randbits(32)
+                    np.random.seed(seed_usado)
+                    try:
+                        import random
+                        random.seed(seed_usado)
+                    except Exception:
+                        pass
                 
                 # Configurar parâmetros do otimizador
                 self.otimizador.definir_parametros(metodo, **combo)
@@ -306,6 +317,7 @@ class VariadorDeParametros:
         for res in self.resultados:
             linha = {
                 'combinacao_id': res['combinacao_id'],
+                'seed_usado': res.get('seed_usado'),
                 **res['parametros'],  # Expande parâmetros como colunas
                 'fitness': res['melhor_custo_fitness'],
                 'custo_real_R$': res['custo_real'],

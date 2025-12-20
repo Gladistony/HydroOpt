@@ -305,23 +305,31 @@ class ConvergenciaTracker:
     """
     Helper para rastrear convergência durante a otimização.
     
-    Mantém histórico do melhor fitness encontrado em cada iteração.
+    Mantém histórico do melhor fitness encontrado em cada iteração, o
+    fitness bruto por avaliação e, opcionalmente, o custo real (só dos
+    diâmetros) por avaliação.
     """
     
     def __init__(self):
         """Inicializa o tracker."""
-        self.historico = []
+        self.historico = []              # melhor fitness acumulado (best-so-far)
+        self.historico_bruto = []        # fitness bruto por avaliação
+        self.historico_custo_real = []   # custo real (somente diâmetros) por avaliação (opcional)
         self.melhor_fitness = float('inf')
         self.iteracao_atual = 0
     
-    def adicionar(self, fitness):
+    def adicionar(self, fitness, custo_real=None):
         """
         Adiciona um novo fitness ao histórico.
         
         Args:
-            fitness (float): Fitness encontrado nesta iteração
+            fitness (float): Fitness encontrado nesta avaliação/iteração
+            custo_real (float, optional): Custo real dos diâmetros nesta avaliação
         """
         self.iteracao_atual += 1
+        
+        # Armazenar fitness bruto
+        self.historico_bruto.append(float(fitness))
         
         # Atualizar melhor fitness
         if fitness < self.melhor_fitness:
@@ -329,10 +337,22 @@ class ConvergenciaTracker:
         
         # Armazenar melhor fitness até agora (convergência)
         self.historico.append(self.melhor_fitness)
+        
+        # Armazenar custo real se informado
+        if custo_real is not None:
+            self.historico_custo_real.append(float(custo_real))
     
     def obter_historico(self):
         """Retorna o histórico de convergência."""
         return np.asarray(self.historico)
+    
+    def obter_historico_bruto(self):
+        """Retorna o histórico de fitness bruto por avaliação."""
+        return np.asarray(self.historico_bruto)
+    
+    def obter_historico_custo_real(self):
+        """Retorna o histórico de custo real por avaliação (se disponível)."""
+        return np.asarray(self.historico_custo_real)
     
     def obter_melhor_fitness(self):
         """Retorna o melhor fitness encontrado."""
@@ -341,5 +361,21 @@ class ConvergenciaTracker:
     def limpar(self):
         """Reseta o tracker."""
         self.historico = []
+        self.historico_bruto = []
+        self.historico_custo_real = []
         self.melhor_fitness = float('inf')
         self.iteracao_atual = 0
+
+    # -------------------------
+    # Utilitários de visualização
+    # -------------------------
+    def acumular_melhor_custo_real(self):
+        """
+        Retorna a sequência best-so-far para custo real, se disponível.
+        """
+        import numpy as np
+        if not self.historico_custo_real:
+            return np.array([])
+        arr = np.asarray(self.historico_custo_real, dtype=float)
+        return np.minimum.accumulate(arr)
+
