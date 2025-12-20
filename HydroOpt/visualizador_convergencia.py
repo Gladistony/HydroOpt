@@ -338,8 +338,11 @@ class ConvergenciaTracker:
         # Armazenar melhor fitness até agora (convergência)
         self.historico.append(self.melhor_fitness)
         
-        # Armazenar custo real se informado
-        if custo_real is not None:
+        # Armazenar custo real (np.nan quando não disponível/viável) para manter alinhamento
+        import numpy as np
+        if custo_real is None:
+            self.historico_custo_real.append(np.nan)
+        else:
             self.historico_custo_real.append(float(custo_real))
     
     def obter_historico(self):
@@ -371,11 +374,17 @@ class ConvergenciaTracker:
     # -------------------------
     def acumular_melhor_custo_real(self):
         """
-        Retorna a sequência best-so-far para custo real, se disponível.
+        Retorna a sequência best-so-far para custo real, alinhada às avaliações.
         """
         import numpy as np
         if not self.historico_custo_real:
             return np.array([])
         arr = np.asarray(self.historico_custo_real, dtype=float)
-        return np.minimum.accumulate(arr)
+        best = np.full(arr.shape, np.nan)
+        current_best = np.nan
+        for i, val in enumerate(arr):
+            if not np.isnan(val):
+                current_best = val if np.isnan(current_best) else min(current_best, val)
+            best[i] = current_best
+        return best
 

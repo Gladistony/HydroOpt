@@ -241,6 +241,8 @@ class Otimizador:
         custo_diametros = self._atualizar_diametros_rede(solution)
         # Disponibilizar custo real (somente diâmetros) para o rastreador
         self._ultimo_custo_diametros = float(custo_diametros)
+        # Por padrão, considerar inviável até provar o contrário
+        self._ultima_viavel = False
         
         # Simular rede com novos diâmetros (sem prints durante otimização)
         resultado = self.rede.simular(verbose=False)
@@ -284,6 +286,9 @@ class Otimizador:
         custo_final = (peso_custo * custo_diametros + 
                       peso_erro * erro_quadrado + 
                       penalidade_pressao)
+
+        # Atualizar flag de viabilidade (sucesso da simulação + pressão atende)
+        self._ultima_viavel = (pressao_min >= self.pressao_min_desejada)
 
         return custo_final
 
@@ -534,7 +539,10 @@ class Otimizador:
                 """
                 value = optimizer_instance._avaliar_rede(solution, verbose=verbose)
                 # Capturar custo real dos diâmetros desta avaliação (se disponível)
-                custo_real = getattr(optimizer_instance, '_ultimo_custo_diametros', None)
+                # Somente reportar custo real quando a solução é viável
+                custo_real = None
+                if getattr(optimizer_instance, '_ultima_viavel', False):
+                    custo_real = getattr(optimizer_instance, '_ultimo_custo_diametros', None)
 
                 # Rastrear convergência se habilitado
                 if rastrear_convergencia:
