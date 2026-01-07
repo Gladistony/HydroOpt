@@ -700,6 +700,8 @@ class Otimizador:
         if rastrear_convergencia:
             resultado['historico_convergencia'] = convergencia_tracker.obter_historico()
             resultado['historico_custo_real'] = convergencia_tracker.obter_historico_custo_real()
+            # Best-so-far de custo real alinhado às avaliações
+            resultado['historico_custo_real_bsf'] = convergencia_tracker.acumular_melhor_custo_real()
         
         return resultado
 
