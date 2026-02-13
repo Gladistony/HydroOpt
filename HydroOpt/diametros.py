@@ -92,7 +92,8 @@ class LDiametro:
             print(f"✓ Diâmetro {diametro}m ({diametro*1000:.0f}mm) adicionado com valor {valor}.")
         else:
             print(f"✓ Diâmetro {diametro}m adicionado com valor {valor}.")
-            self._atualizar_penalidade()
+        
+        self._atualizar_penalidade()
         
         return self
     

@@ -243,6 +243,7 @@ class Otimizador:
         self._ultimo_custo_diametros = float(custo_diametros)
         # Por padrão, considerar inviável até provar o contrário
         self._ultima_viavel = False
+        self._ultima_pressao_min = None
         
         # Simular rede com novos diâmetros (sem prints durante otimização)
         resultado = self.rede.simular(verbose=False)
@@ -254,6 +255,7 @@ class Otimizador:
         # Obter pressões reais
         pressao_info = self.rede.obter_pressao_minima(excluir_reservatorios=True, verbose=verbose)
         pressao_min = pressao_info['valor']
+        self._ultima_pressao_min = pressao_min
         
         # Se pressão é inválida (inf ou nan), retornar penalidade máxima
         if pressao_min == float('inf') or pressao_min != pressao_min:  # NaN check
@@ -484,7 +486,7 @@ class Otimizador:
     # ------------------------------------------------------------------
     # Execução de otimização (MealPy)
     # ------------------------------------------------------------------
-    def otimizar(self, metodo='PSO', verbose=False, solucao_inicial=None, rastrear_convergencia=True, seed=None):
+    def otimizar(self, metodo='PSO', verbose=False, solucao_inicial=None, rastrear_convergencia=True, seed=None, salvar_solucoes=False):
         """
         Executa otimização usando MealPy com penalização de pressão mínima.
 
@@ -493,13 +495,18 @@ class Otimizador:
             verbose (bool): Exibir informações durante otimização
             solucao_inicial (list, optional): População ou solução inicial
             rastrear_convergencia (bool): Rastrear histórico de convergência
+            seed (int, optional): Seed para reprodutibilidade
+            salvar_solucoes (bool): Se True, salva a solução completa de cada avaliação
+                                    no tracker (consome mais memória mas permite análise detalhada)
 
         Returns:
             dict: {
                 'melhor_custo': float,
                 'melhor_solucao': list,
                 'historico': list,
-                'historico_convergencia': list (melhor fitness por época, se rastrear_convergencia=True)
+                'historico_convergencia': array (best-so-far fitness por avaliação),
+                'tracker': ConvergenciaTracker (objeto com todos os dados detalhados),
+                'estatisticas_convergencia': dict (resumo estatístico da convergência)
             }
         """
         metodo = metodo.upper()
@@ -522,7 +529,7 @@ class Otimizador:
         # Inicializar rastreador de convergência
         if rastrear_convergencia:
             from .visualizador_convergencia import ConvergenciaTracker
-            convergencia_tracker = ConvergenciaTracker()
+            convergencia_tracker = ConvergenciaTracker(salvar_solucoes=salvar_solucoes)
         
         # Estimar total de avaliações (épocas * população)
         total_evals = max(1, int(self.epoch) * int(self.pop_size))
@@ -544,9 +551,18 @@ class Otimizador:
                 if getattr(optimizer_instance, '_ultima_viavel', False):
                     custo_real = getattr(optimizer_instance, '_ultimo_custo_diametros', None)
 
+                pressao_min = getattr(optimizer_instance, '_ultima_pressao_min', None)
+                viavel = getattr(optimizer_instance, '_ultima_viavel', False)
+
                 # Rastrear convergência se habilitado
                 if rastrear_convergencia:
-                    convergencia_tracker.adicionar(value, custo_real=custo_real)
+                    convergencia_tracker.adicionar(
+                        value,
+                        custo_real=custo_real,
+                        pressao_min=pressao_min,
+                        viavel=viavel,
+                        solucao=solution
+                    )
 
                 # Atualizar barra de progresso se estiver definida
                 try:
@@ -676,7 +692,13 @@ class Otimizador:
         
         # Rastrear convergência final se habilitado (inclui custo real estimado)
         if rastrear_convergencia:
-            convergencia_tracker.adicionar(melhor_custo, custo_real=custo_real_investimento)
+            convergencia_tracker.adicionar(
+                melhor_custo,
+                custo_real=custo_real_investimento,
+                pressao_min=None,
+                viavel=True,
+                solucao=melhor_solucao
+            )
 
         if self.verbose:
             print(f"\n{'='*60}")
@@ -700,8 +722,12 @@ class Otimizador:
         if rastrear_convergencia:
             resultado['historico_convergencia'] = convergencia_tracker.obter_historico()
             resultado['historico_custo_real'] = convergencia_tracker.obter_historico_custo_real()
-            # Best-so-far de custo real alinhado às avaliações
             resultado['historico_custo_real_bsf'] = convergencia_tracker.acumular_melhor_custo_real()
+            resultado['historico_pressao_min'] = convergencia_tracker.obter_historico_pressao_min()
+            resultado['historico_viavel'] = convergencia_tracker.obter_historico_viavel()
+            resultado['historico_fitness_bruto'] = convergencia_tracker.obter_historico_bruto()
+            resultado['tracker'] = convergencia_tracker
+            resultado['estatisticas_convergencia'] = convergencia_tracker.obter_estatisticas()
         
         return resultado
 

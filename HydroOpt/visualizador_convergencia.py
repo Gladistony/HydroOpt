@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import List, Dict, Optional
 import pandas as pd
+import json
 
 
 class VisualizadorConvergencia:
@@ -294,6 +295,231 @@ class VisualizadorConvergencia:
         
         print("="*80 + "\n")
     
+    def adicionar_tracker(self, tracker, label, dados_adicionais=None):
+        """
+        Adiciona dados de um ConvergenciaTracker diretamente.
+        
+        Args:
+            tracker (ConvergenciaTracker): Tracker com dados de convergência
+            label (str): Rótulo para a curva
+            dados_adicionais (dict, optional): Informações extras
+        """
+        historico = tracker.obter_historico()
+        
+        if len(historico) == 0:
+            raise ValueError("Tracker não contém dados")
+        
+        stats = tracker.obter_estatisticas()
+        
+        # Mesclar estatísticas com dados adicionais
+        dados = dados_adicionais.copy() if dados_adicionais else {}
+        dados.update(stats)
+        
+        self.adicionar_convergencia(historico, label, dados_adicionais=dados)
+        
+        # Guardar referência ao tracker completo para plotar_detalhado
+        self.convergencias[-1]['tracker'] = tracker
+    
+    def plotar_detalhado(self, tracker=None, titulo=None, salvar_em=None, mostrar=True):
+        """
+        Gera gráfico multi-painel com análise detalhada de convergência.
+        
+        Painéis:
+        1. Fitness bruto (dispersão) + best-so-far (linha)
+        2. Custo real dos diâmetros (evolução)
+        3. Pressão mínima (evolução + linha de referência)
+        4. Percentual de soluções viáveis (acumulado)
+        
+        Args:
+            tracker (ConvergenciaTracker, optional): Tracker a plotar. Se None,
+                usa o último tracker adicionado via adicionar_tracker()
+            titulo (str, optional): Título geral
+            salvar_em (str, optional): Caminho para salvar a figura
+            mostrar (bool): Exibir o gráfico
+        
+        Returns:
+            tuple: (fig, axes) - Figura e array de eixos matplotlib
+        """
+        # Obter tracker
+        if tracker is None:
+            for conv in reversed(self.convergencias):
+                if 'tracker' in conv:
+                    tracker = conv['tracker']
+                    break
+            if tracker is None:
+                raise ValueError(
+                    "Nenhum tracker disponível. Passe um ConvergenciaTracker como argumento "
+                    "ou use adicionar_tracker() primeiro."
+                )
+        
+        titulo = titulo or "Análise Detalhada de Convergência"
+        
+        # Obter dados
+        fitness_bruto = tracker.obter_historico_bruto()
+        fitness_bsf = tracker.obter_historico()
+        custo_real = tracker.obter_historico_custo_real()
+        custo_real_bsf = tracker.acumular_melhor_custo_real()
+        pressao_min = tracker.obter_historico_pressao_min()
+        viavel = tracker.obter_historico_viavel()
+        
+        n = len(fitness_bruto)
+        avaliacoes = np.arange(1, n + 1)
+        
+        fig, axes = plt.subplots(2, 2, figsize=(16, 10), dpi=self.dpi)
+        fig.suptitle(titulo, fontsize=16, fontweight='bold')
+        
+        # --- Painel 1: Fitness ---
+        ax1 = axes[0, 0]
+        cores_viavel = np.where(viavel, '#2ca02c', '#d62728')
+        ax1.scatter(avaliacoes, fitness_bruto, c=cores_viavel, s=8, alpha=0.3, label='Avaliações')
+        ax1.plot(avaliacoes, fitness_bsf, color='#1f77b4', linewidth=2, label='Melhor acumulado')
+        ax1.set_xlabel('Avaliação', fontsize=11)
+        ax1.set_ylabel('Fitness', fontsize=11)
+        ax1.set_title('Evolução do Fitness', fontsize=12, fontweight='bold')
+        ax1.legend(fontsize=9)
+        ax1.grid(True, alpha=0.3, linestyle='--')
+        
+        # --- Painel 2: Custo Real ---
+        ax2 = axes[0, 1]
+        mask_custo = ~np.isnan(custo_real)
+        if mask_custo.any():
+            ax2.scatter(avaliacoes[mask_custo], custo_real[mask_custo], s=10, alpha=0.3,
+                        color='#ff7f0e', label='Custo por avaliação')
+            mask_bsf = ~np.isnan(custo_real_bsf)
+            if mask_bsf.any():
+                ax2.plot(avaliacoes[mask_bsf], custo_real_bsf[mask_bsf], color='#d62728',
+                        linewidth=2, label='Melhor custo acumulado')
+        ax2.set_xlabel('Avaliação', fontsize=11)
+        ax2.set_ylabel('Custo Real (R$)', fontsize=11)
+        ax2.set_title('Evolução do Custo Real', fontsize=12, fontweight='bold')
+        ax2.legend(fontsize=9)
+        ax2.grid(True, alpha=0.3, linestyle='--')
+        
+        # --- Painel 3: Pressão Mínima ---
+        ax3 = axes[1, 0]
+        mask_pressao = ~np.isnan(pressao_min)
+        if mask_pressao.any():
+            cores_p = np.where(viavel[mask_pressao], '#2ca02c', '#d62728')
+            ax3.scatter(avaliacoes[mask_pressao], pressao_min[mask_pressao],
+                       c=cores_p, s=10, alpha=0.3, label='Pressão por avaliação')
+        # Linha de referência (pressão desejada)
+        ax3.axhline(y=10.0, color='red', linestyle='--', linewidth=1.5,
+                     alpha=0.7, label='Pressão mínima desejada')
+        ax3.set_xlabel('Avaliação', fontsize=11)
+        ax3.set_ylabel('Pressão Mínima (m)', fontsize=11)
+        ax3.set_title('Evolução da Pressão Mínima', fontsize=12, fontweight='bold')
+        ax3.legend(fontsize=9)
+        ax3.grid(True, alpha=0.3, linestyle='--')
+        
+        # --- Painel 4: Viabilidade ---
+        ax4 = axes[1, 1]
+        viavel_cumsum = np.cumsum(viavel)
+        percentual_viavel = viavel_cumsum / avaliacoes * 100
+        ax4.plot(avaliacoes, percentual_viavel, color='#2ca02c', linewidth=2)
+        ax4.fill_between(avaliacoes, 0, percentual_viavel, alpha=0.2, color='#2ca02c')
+        ax4.set_xlabel('Avaliação', fontsize=11)
+        ax4.set_ylabel('Soluções Viáveis (%)', fontsize=11)
+        ax4.set_title('Percentual de Soluções Viáveis', fontsize=12, fontweight='bold')
+        ax4.set_ylim(0, 105)
+        ax4.grid(True, alpha=0.3, linestyle='--')
+        
+        # Texto com estatísticas
+        stats = tracker.obter_estatisticas()
+        textstr = (f"Total: {stats['total_avaliacoes']}\n"
+                   f"Viáveis: {stats['avaliacoes_viaveis']} ({stats['percentual_viaveis']:.1f}%)\n"
+                   f"Melhor fitness: {stats['melhor_fitness']:.2f}")
+        if 'melhor_custo_real' in stats:
+            textstr += f"\nMelhor custo: R$ {stats['melhor_custo_real']:,.2f}"
+        ax4.text(0.98, 0.02, textstr, transform=ax4.transAxes, fontsize=9,
+                verticalalignment='bottom', horizontalalignment='right',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+        plt.tight_layout()
+        
+        if salvar_em:
+            Path(salvar_em).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(salvar_em, dpi=self.dpi, bbox_inches='tight')
+            if self.verbose:
+                print(f"✓ Gráfico detalhado salvo em: {salvar_em}")
+        
+        if mostrar:
+            plt.show()
+        
+        return fig, axes
+    
+    def plotar_comparativo_trackers(self, trackers_dict, titulo=None, salvar_em=None, mostrar=True):
+        """
+        Compara múltiplos trackers em gráficos sobrepostos.
+        
+        Args:
+            trackers_dict (dict): {label: ConvergenciaTracker}
+            titulo (str, optional): Título do gráfico
+            salvar_em (str, optional): Caminho para salvar
+            mostrar (bool): Exibir o gráfico
+        
+        Returns:
+            tuple: (fig, axes)
+        """
+        titulo = titulo or "Comparação de Otimizações"
+        
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5), dpi=self.dpi)
+        fig.suptitle(titulo, fontsize=16, fontweight='bold')
+        
+        cores = plt.cm.tab10(np.linspace(0, 1, max(len(trackers_dict), 1)))
+        
+        for idx, (label, tracker) in enumerate(trackers_dict.items()):
+            cor = cores[idx]
+            
+            fitness_bsf = tracker.obter_historico()
+            custo_bsf = tracker.acumular_melhor_custo_real()
+            pressao = tracker.obter_historico_pressao_min()
+            n = len(fitness_bsf)
+            avals = np.arange(1, n + 1)
+            
+            # Fitness best-so-far
+            axes[0].plot(avals, fitness_bsf, color=cor, linewidth=2, label=label, alpha=0.8)
+            
+            # Custo real best-so-far
+            mask = ~np.isnan(custo_bsf)
+            if mask.any():
+                axes[1].plot(avals[mask], custo_bsf[mask], color=cor, linewidth=2, label=label, alpha=0.8)
+            
+            # Pressão mínima
+            mask_p = ~np.isnan(pressao)
+            if mask_p.any():
+                axes[2].scatter(avals[mask_p], pressao[mask_p], color=cor, s=6, alpha=0.2, label=label)
+        
+        axes[0].set_title('Fitness (Best-so-far)', fontweight='bold')
+        axes[0].set_xlabel('Avaliação')
+        axes[0].set_ylabel('Fitness')
+        axes[0].legend(fontsize=9)
+        axes[0].grid(True, alpha=0.3, linestyle='--')
+        
+        axes[1].set_title('Custo Real (Best-so-far)', fontweight='bold')
+        axes[1].set_xlabel('Avaliação')
+        axes[1].set_ylabel('Custo Real (R$)')
+        axes[1].legend(fontsize=9)
+        axes[1].grid(True, alpha=0.3, linestyle='--')
+        
+        axes[2].set_title('Pressão Mínima', fontweight='bold')
+        axes[2].set_xlabel('Avaliação')
+        axes[2].set_ylabel('Pressão (m)')
+        axes[2].axhline(y=10.0, color='red', linestyle='--', linewidth=1.5, alpha=0.7)
+        axes[2].grid(True, alpha=0.3, linestyle='--')
+        
+        plt.tight_layout()
+        
+        if salvar_em:
+            Path(salvar_em).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(salvar_em, dpi=self.dpi, bbox_inches='tight')
+            if self.verbose:
+                print(f"✓ Gráfico comparativo salvo em: {salvar_em}")
+        
+        if mostrar:
+            plt.show()
+        
+        return fig, axes
+    
     def limpar(self):
         """Limpa todas as convergências adicionadas."""
         self.convergencias = []
@@ -303,88 +529,332 @@ class VisualizadorConvergencia:
 
 class ConvergenciaTracker:
     """
-    Helper para rastrear convergência durante a otimização.
+    Rastreador completo de convergência durante a otimização.
     
-    Mantém histórico do melhor fitness encontrado em cada iteração, o
-    fitness bruto por avaliação e, opcionalmente, o custo real (só dos
-    diâmetros) por avaliação.
+    Mantém histórico detalhado de cada avaliação incluindo:
+    - Fitness bruto e melhor acumulado (best-so-far)
+    - Custo real (somente diâmetros)
+    - Pressão mínima da rede
+    - Viabilidade da solução
+    - Solução completa (opcional, configurável)
+    
+    Todos os dados são mantidos em memória durante a otimização e podem
+    ser exportados para DataFrame, CSV ou JSON ao final.
+    
+    Exemplo:
+        >>> tracker = ConvergenciaTracker(salvar_solucoes=True)
+        >>> # Durante otimização (automático):
+        >>> tracker.adicionar(fitness=1500.0, custo_real=1200.0, pressao_min=12.5, viavel=True)
+        >>> # Após otimização:
+        >>> df = tracker.to_dataframe()
+        >>> tracker.exportar_csv('convergencia.csv')
+        >>> tracker.exportar_json('convergencia.json')
+        >>> stats = tracker.obter_estatisticas()
     """
     
-    def __init__(self):
-        """Inicializa o tracker."""
-        self.historico = []              # melhor fitness acumulado (best-so-far)
-        self.historico_bruto = []        # fitness bruto por avaliação
-        self.historico_custo_real = []   # custo real (somente diâmetros) por avaliação (opcional)
-        self.melhor_fitness = float('inf')
-        self.iteracao_atual = 0
-    
-    def adicionar(self, fitness, custo_real=None):
+    def __init__(self, salvar_solucoes=False):
         """
-        Adiciona um novo fitness ao histórico.
+        Inicializa o tracker.
         
         Args:
-            fitness (float): Fitness encontrado nesta avaliação/iteração
-            custo_real (float, optional): Custo real dos diâmetros nesta avaliação
+            salvar_solucoes (bool): Se True, salva a solução completa (vetor de diâmetros)
+                                    a cada avaliação. Consome mais memória mas permite
+                                    análise detalhada de como as soluções evoluíram.
+        """
+        self.salvar_solucoes = salvar_solucoes
+        
+        # Dados por avaliação
+        self.historico_bruto = []          # fitness bruto por avaliação
+        self.historico = []                # melhor fitness acumulado (best-so-far)
+        self.historico_custo_real = []     # custo real (diâmetros) por avaliação
+        self.historico_pressao_min = []    # pressão mínima por avaliação
+        self.historico_viavel = []         # viabilidade por avaliação
+        self.historico_solucoes = []       # soluções completas (se salvar_solucoes=True)
+        
+        # Estado
+        self.melhor_fitness = float('inf')
+        self.melhor_custo_real = float('inf')
+        self.melhor_solucao = None
+        self.iteracao_atual = 0
+    
+    def adicionar(self, fitness, custo_real=None, pressao_min=None, viavel=False, solucao=None):
+        """
+        Registra dados de uma avaliação.
+        
+        Args:
+            fitness (float): Valor da função objetivo nesta avaliação
+            custo_real (float, optional): Custo real dos diâmetros (sem penalidades)
+            pressao_min (float, optional): Pressão mínima da rede nesta avaliação
+            viavel (bool): Se a solução atende à restrição de pressão mínima
+            solucao (array-like, optional): Vetor solução (ignorado se salvar_solucoes=False)
         """
         self.iteracao_atual += 1
         
-        # Armazenar fitness bruto
+        # Fitness bruto
         self.historico_bruto.append(float(fitness))
         
-        # Atualizar melhor fitness
+        # Atualizar melhor fitness (best-so-far)
         if fitness < self.melhor_fitness:
             self.melhor_fitness = fitness
-        
-        # Armazenar melhor fitness até agora (convergência)
         self.historico.append(self.melhor_fitness)
         
-        # Armazenar custo real (np.nan quando não disponível/viável) para manter alinhamento
-        import numpy as np
-        if custo_real is None:
-            self.historico_custo_real.append(np.nan)
-        else:
+        # Custo real (np.nan quando não disponível)
+        if custo_real is not None:
             self.historico_custo_real.append(float(custo_real))
+            if viavel and custo_real < self.melhor_custo_real:
+                self.melhor_custo_real = custo_real
+        else:
+            self.historico_custo_real.append(np.nan)
+        
+        # Pressão mínima
+        if pressao_min is not None:
+            self.historico_pressao_min.append(float(pressao_min))
+        else:
+            self.historico_pressao_min.append(np.nan)
+        
+        # Viabilidade
+        self.historico_viavel.append(bool(viavel))
+        
+        # Solução completa (se configurado)
+        if self.salvar_solucoes and solucao is not None:
+            self.historico_solucoes.append(np.asarray(solucao, dtype=float).tolist())
+        elif self.salvar_solucoes:
+            self.historico_solucoes.append(None)
+        
+        # Atualizar melhor solução viável
+        if viavel and solucao is not None:
+            if custo_real is not None and custo_real <= self.melhor_custo_real:
+                self.melhor_solucao = np.asarray(solucao, dtype=float).copy()
     
+    # -----------------------------------------------------------
+    # Acesso aos dados
+    # -----------------------------------------------------------
     def obter_historico(self):
-        """Retorna o histórico de convergência."""
-        return np.asarray(self.historico)
+        """Retorna histórico best-so-far de fitness."""
+        return np.asarray(self.historico, dtype=float)
     
     def obter_historico_bruto(self):
-        """Retorna o histórico de fitness bruto por avaliação."""
-        return np.asarray(self.historico_bruto)
+        """Retorna histórico de fitness bruto por avaliação."""
+        return np.asarray(self.historico_bruto, dtype=float)
     
     def obter_historico_custo_real(self):
-        """Retorna o histórico de custo real por avaliação (se disponível)."""
-        return np.asarray(self.historico_custo_real)
+        """Retorna histórico de custo real por avaliação."""
+        return np.asarray(self.historico_custo_real, dtype=float)
+    
+    def obter_historico_pressao_min(self):
+        """Retorna histórico de pressão mínima por avaliação."""
+        return np.asarray(self.historico_pressao_min, dtype=float)
+    
+    def obter_historico_viavel(self):
+        """Retorna histórico de viabilidade por avaliação."""
+        return np.asarray(self.historico_viavel, dtype=bool)
     
     def obter_melhor_fitness(self):
         """Retorna o melhor fitness encontrado."""
         return self.melhor_fitness
+    
+    def acumular_melhor_custo_real(self):
+        """
+        Retorna a sequência best-so-far para custo real, alinhada às avaliações.
+        Apenas soluções viáveis são consideradas.
+        """
+        if not self.historico_custo_real:
+            return np.array([])
+        arr = np.asarray(self.historico_custo_real, dtype=float)
+        viavel_arr = np.asarray(self.historico_viavel, dtype=bool)
+        best = np.full(arr.shape, np.nan)
+        current_best = np.nan
+        for i in range(len(arr)):
+            if viavel_arr[i] and not np.isnan(arr[i]):
+                current_best = arr[i] if np.isnan(current_best) else min(current_best, arr[i])
+            best[i] = current_best
+        return best
+    
+    def acumular_melhor_pressao_min(self):
+        """
+        Retorna a sequência best-so-far para pressão mínima (somente viáveis).
+        """
+        if not self.historico_pressao_min:
+            return np.array([])
+        arr = np.asarray(self.historico_pressao_min, dtype=float)
+        viavel_arr = np.asarray(self.historico_viavel, dtype=bool)
+        best = np.full(arr.shape, np.nan)
+        current_best = np.nan
+        for i in range(len(arr)):
+            if viavel_arr[i] and not np.isnan(arr[i]):
+                current_best = arr[i] if np.isnan(current_best) else max(current_best, arr[i])
+            best[i] = current_best
+        return best
+    
+    # -----------------------------------------------------------
+    # Exportação
+    # -----------------------------------------------------------
+    def to_dataframe(self):
+        """
+        Exporta todos os dados de convergência para um DataFrame pandas.
+        
+        Returns:
+            pd.DataFrame: DataFrame com colunas:
+                - avaliacao: número sequencial da avaliação
+                - fitness_bruto: valor da função objetivo
+                - fitness_melhor: melhor acumulado (best-so-far)
+                - custo_real: custo real dos diâmetros
+                - custo_real_melhor: melhor custo real acumulado
+                - pressao_min: pressão mínima da rede
+                - viavel: se a solução é viável
+        """
+        n = len(self.historico_bruto)
+        if n == 0:
+            return pd.DataFrame()
+        
+        dados = {
+            'avaliacao': list(range(1, n + 1)),
+            'fitness_bruto': self.historico_bruto,
+            'fitness_melhor': self.historico,
+            'custo_real': self.historico_custo_real,
+            'custo_real_melhor': self.acumular_melhor_custo_real().tolist(),
+            'pressao_min': self.historico_pressao_min,
+            'viavel': self.historico_viavel,
+        }
+        
+        df = pd.DataFrame(dados)
+        
+        # Adicionar soluções se disponíveis
+        if self.salvar_solucoes and self.historico_solucoes:
+            df['solucao'] = self.historico_solucoes
+        
+        return df
+    
+    def exportar_csv(self, caminho):
+        """
+        Exporta dados de convergência para CSV.
+        
+        Args:
+            caminho (str): Caminho do arquivo CSV de saída
+        
+        Returns:
+            str: Caminho do arquivo salvo
+        """
+        df = self.to_dataframe()
+        Path(caminho).parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(caminho, index=False)
+        print(f"✓ Dados de convergência exportados para: {caminho}")
+        return caminho
+    
+    def exportar_json(self, caminho):
+        """
+        Exporta dados de convergência para JSON com estrutura completa.
+        
+        Args:
+            caminho (str): Caminho do arquivo JSON de saída
+        
+        Returns:
+            str: Caminho do arquivo salvo
+        """
+        dados = {
+            'total_avaliacoes': self.iteracao_atual,
+            'melhor_fitness': float(self.melhor_fitness),
+            'melhor_custo_real': float(self.melhor_custo_real) if self.melhor_custo_real != float('inf') else None,
+            'avaliacoes': []
+        }
+        
+        for i in range(len(self.historico_bruto)):
+            avaliacao = {
+                'id': i + 1,
+                'fitness_bruto': self.historico_bruto[i],
+                'fitness_melhor': self.historico[i],
+                'custo_real': self.historico_custo_real[i] if not np.isnan(self.historico_custo_real[i]) else None,
+                'pressao_min': self.historico_pressao_min[i] if i < len(self.historico_pressao_min) and not np.isnan(self.historico_pressao_min[i]) else None,
+                'viavel': self.historico_viavel[i] if i < len(self.historico_viavel) else None,
+            }
+            if self.salvar_solucoes and i < len(self.historico_solucoes):
+                avaliacao['solucao'] = self.historico_solucoes[i]
+            dados['avaliacoes'].append(avaliacao)
+        
+        Path(caminho).parent.mkdir(parents=True, exist_ok=True)
+        with open(caminho, 'w', encoding='utf-8') as f:
+            json.dump(dados, f, indent=2, ensure_ascii=False)
+        print(f"✓ Dados de convergência exportados para: {caminho}")
+        return caminho
+    
+    # -----------------------------------------------------------
+    # Estatísticas resumidas
+    # -----------------------------------------------------------
+    def obter_estatisticas(self):
+        """
+        Retorna dicionário com estatísticas de convergência.
+        
+        Returns:
+            dict: Estatísticas incluindo total de avaliações, viáveis, melhor fitness, etc.
+        """
+        n = len(self.historico_bruto)
+        if n == 0:
+            return {'total_avaliacoes': 0}
+        
+        arr_fitness = np.asarray(self.historico_bruto, dtype=float)
+        arr_viavel = np.asarray(self.historico_viavel, dtype=bool)
+        arr_custo = np.asarray(self.historico_custo_real, dtype=float)
+        arr_pressao = np.asarray(self.historico_pressao_min, dtype=float)
+        
+        n_viaveis = int(arr_viavel.sum())
+        custos_viaveis = arr_custo[arr_viavel & ~np.isnan(arr_custo)]
+        pressoes_viaveis = arr_pressao[arr_viavel & ~np.isnan(arr_pressao)]
+        
+        stats = {
+            'total_avaliacoes': n,
+            'avaliacoes_viaveis': n_viaveis,
+            'percentual_viaveis': (n_viaveis / n * 100) if n > 0 else 0,
+            'melhor_fitness': float(self.melhor_fitness),
+            'fitness_medio': float(np.nanmean(arr_fitness)),
+            'fitness_desvio': float(np.nanstd(arr_fitness)),
+        }
+        
+        if len(custos_viaveis) > 0:
+            stats['melhor_custo_real'] = float(np.nanmin(custos_viaveis))
+            stats['custo_real_medio'] = float(np.nanmean(custos_viaveis))
+            stats['custo_real_desvio'] = float(np.nanstd(custos_viaveis))
+        
+        if len(pressoes_viaveis) > 0:
+            stats['pressao_min_melhor_viavel'] = float(np.nanmin(pressoes_viaveis))
+            stats['pressao_max_melhor_viavel'] = float(np.nanmax(pressoes_viaveis))
+            stats['pressao_media_viavel'] = float(np.nanmean(pressoes_viaveis))
+        
+        return stats
+    
+    def exibir_estatisticas(self):
+        """Exibe estatísticas formatadas de convergência."""
+        stats = self.obter_estatisticas()
+        
+        print("\n" + "="*70)
+        print("ESTATÍSTICAS DE CONVERGÊNCIA")
+        print("="*70)
+        print(f"  Total de avaliações:     {stats.get('total_avaliacoes', 0)}")
+        print(f"  Avaliações viáveis:      {stats.get('avaliacoes_viaveis', 0)} ({stats.get('percentual_viaveis', 0):.1f}%)")
+        print(f"  Melhor fitness:          {stats.get('melhor_fitness', 'N/A'):.6f}")
+        print(f"  Fitness médio:           {stats.get('fitness_medio', 'N/A'):.2f}")
+        print(f"  Desvio fitness:          {stats.get('fitness_desvio', 'N/A'):.2f}")
+        
+        if 'melhor_custo_real' in stats:
+            print(f"\n  💰 Melhor custo real:    R$ {stats['melhor_custo_real']:,.2f}")
+            print(f"  Custo real médio:        R$ {stats.get('custo_real_medio', 0):,.2f}")
+        
+        if 'pressao_min_melhor_viavel' in stats:
+            print(f"\n  Pressão mín (viáveis):   {stats['pressao_min_melhor_viavel']:.2f} m")
+            print(f"  Pressão máx (viáveis):   {stats['pressao_max_melhor_viavel']:.2f} m")
+            print(f"  Pressão média (viáveis): {stats['pressao_media_viavel']:.2f} m")
+        
+        print("="*70 + "\n")
     
     def limpar(self):
         """Reseta o tracker."""
         self.historico = []
         self.historico_bruto = []
         self.historico_custo_real = []
+        self.historico_pressao_min = []
+        self.historico_viavel = []
+        self.historico_solucoes = []
         self.melhor_fitness = float('inf')
+        self.melhor_custo_real = float('inf')
+        self.melhor_solucao = None
         self.iteracao_atual = 0
-
-    # -------------------------
-    # Utilitários de visualização
-    # -------------------------
-    def acumular_melhor_custo_real(self):
-        """
-        Retorna a sequência best-so-far para custo real, alinhada às avaliações.
-        """
-        import numpy as np
-        if not self.historico_custo_real:
-            return np.array([])
-        arr = np.asarray(self.historico_custo_real, dtype=float)
-        best = np.full(arr.shape, np.nan)
-        current_best = np.nan
-        for i, val in enumerate(arr):
-            if not np.isnan(val):
-                current_best = val if np.isnan(current_best) else min(current_best, val)
-            best[i] = current_best
-        return best
 

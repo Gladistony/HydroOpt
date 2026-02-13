@@ -67,22 +67,34 @@ def testar_ldiametro():
     - Adicionar dicionário
     - Métodos de consulta
     - Criação de padrão
+    
+    Returns:
+        tuple: (bool, list) - (passou, lista_de_mensagens)
     """
+    import time
+    inicio = time.time()
+    
     print("\n" + "="*60)
-    print("TESTANDO CLASSE LDIAMETRO")
+    print("TESTANDO CLASSE LDiametro")
     print("="*60)
+    
+    erros = []
+    testes_passaram = 0
+    total_testes = 13
     
     try:
         # Teste 1: Criar lista vazia
         print("\n[Teste 1] Criando lista vazia...")
         lista = LDiametro()
         assert len(lista) == 0, "Lista deveria estar vazia"
+        testes_passaram += 1
         print("✓ Lista vazia criada com sucesso")
         
         # Teste 2: Adicionar diâmetros em metros
         print("\n[Teste 2] Adicionando diâmetros em metros...")
         lista.adicionar(0.1, 50.0).adicionar(0.15, 75.0).adicionar(0.2, 100.0)
-        assert len(lista) == 3, "Lista deveria ter 3 diâmetros"
+        assert len(lista) == 3, f"Lista deveria ter 3 diâmetros, tem {len(lista)}"
+        testes_passaram += 1
         print("✓ Diâmetros em metros adicionados com sucesso")
         
         # Teste 3: Conversão automática de mm para m
@@ -90,6 +102,7 @@ def testar_ldiametro():
         lista2 = LDiametro()
         lista2.adicionar(100, 50.0)  # Será convertido para 0.1m
         assert 0.1 in lista2, "Diâmetro 0.1m deveria estar na lista"
+        testes_passaram += 1
         print("✓ Conversão automática funcionou")
         
         # Teste 4: Forçar valor sem conversão
@@ -100,12 +113,14 @@ def testar_ldiametro():
             print("✓ Valor forçado aceito (mesmo sendo muito grande)")
         except ValueError:
             print("✓ Proteção contra valores muito grandes funcionou")
+        testes_passaram += 1
         
         # Teste 5: Adicionar dicionário
         print("\n[Teste 5] Adicionando múltiplos diâmetros via dicionário...")
         novos = {50: 20.0, 75: 35.0, 150: 80.0}  # Em mm, serão convertidos
         lista.adicionar_dicionario(novos)
-        assert len(lista) >= 5, "Lista deveria ter mais de 5 diâmetros após adicionar dicionário"
+        assert len(lista) >= 5, f"Lista deveria ter mais de 5 diâmetros, tem {len(lista)}"
+        testes_passaram += 1
         print("✓ Dicionário de diâmetros adicionado com sucesso")
         
         # Teste 6: Métodos de consulta
@@ -113,22 +128,28 @@ def testar_ldiametro():
         diametros = lista.obter_diametros()
         valores = lista.obter_valores()
         assert len(diametros) == len(valores), "Tamanho de diâmetros e valores deveria ser igual"
+        testes_passaram += 1
         print(f"✓ Consultas funcionando: {len(diametros)} diâmetros")
         
         # Teste 7: Obter valor específico
         print("\n[Teste 7] Obtendo valor de diâmetro específico...")
         valor = lista.obter_valor(0.1)
+        assert valor is not None, "Valor não deveria ser None"
+        testes_passaram += 1
         print(f"✓ Valor do diâmetro 0.1m: {valor}")
         
         # Teste 8: Diâmetro mais próximo
         print("\n[Teste 8] Procurando diâmetro mais próximo...")
         mais_proximo = lista.diametro_mais_proximo(0.125)
+        assert mais_proximo is not None, "Diâmetro mais próximo não deveria ser None"
+        testes_passaram += 1
         print(f"✓ Diâmetro mais próximo de 0.125m: {mais_proximo}m")
         
         # Teste 9: Criar lista padrão
         print("\n[Teste 9] Criando lista com diâmetros padrão...")
         lista_padrao = LDiametro.criar_padrao()
-        assert len(lista_padrao) == 10, "Lista padrão deveria ter 10 diâmetros"
+        assert len(lista_padrao) == 10, f"Lista padrão deveria ter 10 diâmetros, tem {len(lista_padrao)}"
+        testes_passaram += 1
         print(f"✓ Lista padrão criada com {len(lista_padrao)} diâmetros")
         
         # Teste 10: Criar de mm
@@ -136,6 +157,7 @@ def testar_ldiametro():
         lista_mm = LDiametro.criar_de_mm({50: 20, 100: 50, 200: 100})
         assert 0.05 in lista_mm, "Diâmetro 0.05m (50mm) deveria estar na lista"
         assert 0.1 in lista_mm, "Diâmetro 0.1m (100mm) deveria estar na lista"
+        testes_passaram += 1
         print(f"✓ Lista criada de mm com sucesso ({len(lista_mm)} diâmetros)")
         
         # Teste 11: Operações especiais
@@ -144,26 +166,35 @@ def testar_ldiametro():
         valor_via_index = lista[0.1]
         lista[0.3] = 120.0  # Adicionar via indexação
         assert 0.3 in lista, "Indexação deveria funcionar"
+        testes_passaram += 1
         print("✓ Operações especiais funcionando")
         
         # Teste 12: Atualizar valor
         print("\n[Teste 12] Atualizando valor de diâmetro...")
         lista.atualizar_valor(0.1, 55.0)
         assert lista.obter_valor(0.1) == 55.0, "Valor deveria ter sido atualizado"
+        testes_passaram += 1
         print("✓ Valor atualizado com sucesso")
         
         # Teste 13: Representação em string
         print("\n[Teste 13] Testando representação em string...")
-        print(lista)
+        repr_str = str(lista)
+        assert len(repr_str) > 0, "Representação em string não deveria ser vazia"
+        print(repr_str)
+        testes_passaram += 1
         print("✓ Representação em string funcionando")
         
-        print("\n" + "="*60)
-        print("✓ TODOS OS TESTES DE LDIAMETRO PASSARAM!")
+        duracao = time.time() - inicio
+        print(f"\n{'='*60}")
+        print(f"✓ TESTES LDiametro: {testes_passaram}/{total_testes} passaram ({duracao:.2f}s)")
         print("="*60)
         return True
         
     except Exception as e:
-        print(f"\n✗ ERRO NOS TESTES DE LDIAMETRO: {str(e)}")
+        duracao = time.time() - inicio
+        erros.append(str(e))
+        print(f"\n✗ ERRO NOS TESTES DE LDiametro: {str(e)}")
+        print(f"  Testes passados antes do erro: {testes_passaram}/{total_testes} ({duracao:.2f}s)")
         print("="*60)
         return False
 
@@ -178,32 +209,53 @@ def testar_rede():
     - Execução de simulação
     - Obtenção de pressões
     - Cálculo de pressão mínima
+    
+    Returns:
+        bool: True se todos os testes passarem
     """
+    import time
+    inicio = time.time()
+    
     print("\n" + "="*60)
     print("TESTANDO CLASSE REDE")
     print("="*60)
+    
+    testes_passaram = 0
+    total_testes = 5
     
     try:
         # Teste 1: Criar rede aleatória de teste
         print("\n[Teste 1] Criando rede de teste aleatória...")
         rede = Rede()
+        assert rede.wn is not None, "Rede não foi criada"
+        assert len(rede.wn.pipe_name_list) > 0, "Rede deveria ter tubulações"
+        testes_passaram += 1
+        print("✓ Rede criada com sucesso")
         
         # Teste 2: Executar simulação
         print("\n[Teste 2] Executando simulação...")
         resultado_sim = rede.simular()
         
         if not resultado_sim['sucesso']:
-            print(f"✗ Simulação falhou: {resultado_sim['erro']}")
+            print(f"✗ Simulação falhou: {resultado_sim.get('erro', 'desconhecido')}")
             return False
+        testes_passaram += 1
+        print("✓ Simulação concluída com sucesso")
         
         # Teste 3: Obter pressões
         print("\n[Teste 3] Obtendo pressões da rede...")
         pressoes = rede.obter_pressoes()
+        assert pressoes is not None, "Pressões não deveriam ser None"
+        assert not pressoes.empty, "DataFrame de pressões não deveria estar vazio"
+        testes_passaram += 1
         print(f"✓ Pressões obtidas: {len(pressoes.columns)} nós")
         
         # Teste 4: Obter pressão mínima (sem reservatórios)
         print("\n[Teste 4] Calculando pressão mínima...")
         pressao_min = rede.obter_pressao_minima(excluir_reservatorios=True)
+        assert pressao_min['valor'] != float('inf'), "Pressão mínima não deveria ser infinita"
+        testes_passaram += 1
+        print(f"✓ Pressão mínima: {pressao_min['valor']:.2f}m no nó {pressao_min['no']}")
         
         # Teste 5: Salvar rede
         print("\n[Teste 5] Salvando rede...")
@@ -213,17 +265,21 @@ def testar_rede():
         if os.path.exists(arquivo_teste):
             print(f"✓ Rede salva com sucesso em: {arquivo_teste}")
             os.remove(arquivo_teste)
+            testes_passaram += 1
         else:
             print(f"✗ Falha ao salvar a rede")
             return False
         
-        print("\n" + "="*60)
-        print("✓ TODOS OS TESTES DE REDE PASSARAM!")
+        duracao = time.time() - inicio
+        print(f"\n{'='*60}")
+        print(f"✓ TESTES REDE: {testes_passaram}/{total_testes} passaram ({duracao:.2f}s)")
         print("="*60)
         return True
         
     except Exception as e:
+        duracao = time.time() - inicio
         print(f"\n✗ ERRO NOS TESTES DE REDE: {str(e)}")
+        print(f"  Testes passados antes do erro: {testes_passaram}/{total_testes} ({duracao:.2f}s)")
         print("="*60)
         return False
 
@@ -235,6 +291,9 @@ def executar_todos_testes():
     Returns:
         bool: True se todos os testes passarem, False caso contrário
     """
+    import time
+    inicio_total = time.time()
+    
     print("\n")
     print("╔" + "="*58 + "╗")
     print("║" + " "*58 + "║")
@@ -251,6 +310,8 @@ def executar_todos_testes():
     resultados.append(("Rede", testar_rede()))
     
     # Resumo
+    duracao_total = time.time() - inicio_total
+    
     print("\n")
     print("╔" + "="*58 + "╗")
     print("║" + " "*58 + "║")
@@ -259,12 +320,14 @@ def executar_todos_testes():
     
     for nome, passou in resultados:
         status = "✓ PASSOU" if passou else "✗ FALHOU"
-        print(f"║  {nome:30} {status:25} ║")
+        linha = f"  {nome:30} {status}"
+        print(f"║{linha:<58}║")
     
     print("║" + " "*58 + "║")
     
     total_passou = sum(1 for _, passou in resultados if passou)
-    print(f"║  Total: {total_passou}/{len(resultados)} testes passaram" + " "*{58-37} + "║")
+    msg_total = f"  Total: {total_passou}/{len(resultados)} testes passaram ({duracao_total:.2f}s)"
+    print(f"║{msg_total:<58}║")
     
     print("║" + " "*58 + "║")
     print("╚" + "="*58 + "╝")
