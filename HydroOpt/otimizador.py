@@ -577,6 +577,7 @@ class Otimizador:
             bounds=[IntegerVar(lb=0, ub=n_diametros - 1) for _ in range(n_tubos)],
             minmax='min',
             log_to=None,
+            save_population=True,  # Salvar população real de cada época
         )
 
         modelo = self._instanciar_modelo(metodo, swarm_based, evolutionary_based)
@@ -699,8 +700,20 @@ class Otimizador:
             if hasattr(modelo, 'history') and modelo.history is not None:
                 for ep_agent in modelo.history.list_global_best:
                     historico_epocas_mealpy.append(ep_agent.target.objectives[0])
-                # Recalcular épocas do tracker com o número real de épocas do MealPy
-                if rastrear_convergencia and len(historico_epocas_mealpy) > 0:
+                
+                # ===== EXTRAIR POPULAÇÃO REAL DE CADA ÉPOCA =====
+                # O MealPy armazena a população completa (com fitness atualizado)
+                # ao final de cada época. Isso inclui entidades que NÃO foram
+                # reavaliadas pelo obj_func (ex: lobos que copiaram a posição do Alpha).
+                # Esses dados são a fonte REAL para análise estatística do enxame.
+                if rastrear_convergencia and hasattr(modelo.history, 'list_population'):
+                    populacoes = modelo.history.list_population
+                    if len(populacoes) > 0:
+                        convergencia_tracker.definir_populacao_por_epoca(populacoes)
+                    elif len(historico_epocas_mealpy) > 0:
+                        # Fallback: se list_population estiver vazio, recalcular por contagem
+                        convergencia_tracker.recalcular_epocas(len(historico_epocas_mealpy))
+                elif rastrear_convergencia and len(historico_epocas_mealpy) > 0:
                     convergencia_tracker.recalcular_epocas(len(historico_epocas_mealpy))
         except Exception:
             pass

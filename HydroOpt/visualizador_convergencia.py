@@ -888,6 +888,64 @@ class ConvergenciaTracker:
     # -----------------------------------------------------------
     # Dados por época
     # -----------------------------------------------------------
+    def definir_populacao_por_epoca(self, populacoes_mealpy):
+        """
+        Reconstrói dados por época a partir da população REAL do MealPy.
+        
+        O MealPy (com save_population=True) armazena um snapshot da
+        população inteira ao final de cada época. Cada entidade tem seu
+        fitness real atualizado — incluindo entidades que NÃO passaram
+        pelo obj_func naquela época (ex: GWO copia posição do Alpha,
+        PSO mantém partículas que não melhoraram, etc.).
+        
+        Isso resolve o problema de melhor==pior==média / desvio==0,
+        pois agora capturamos a diversidade real do enxame.
+        
+        Args:
+            populacoes_mealpy (list): Lista de populações do MealPy
+                (modelo.history.list_population). Cada entrada é uma
+                lista de Agent com .target.objectives[0] e .solution.
+        """
+        if not populacoes_mealpy:
+            return
+        
+        self.epocas = []
+        self._epoca_idx = 0
+        
+        for i, pop in enumerate(populacoes_mealpy):
+            try:
+                # Extrair fitness de CADA entidade na população
+                fitnesses = []
+                solucoes = []
+                for agente in pop:
+                    fit = agente.target.objectives[0]
+                    fitnesses.append(float(fit))
+                    solucoes.append(agente.solution.tolist() if hasattr(agente.solution, 'tolist') else list(agente.solution))
+                
+                if not fitnesses:
+                    continue
+                
+                arr = np.array(fitnesses)
+                self.epocas.append({
+                    'epoca': i,
+                    'melhor': float(np.min(arr)),
+                    'media': float(np.mean(arr)),
+                    'pior': float(np.max(arr)),
+                    'desvio': float(np.std(arr)),
+                    'todos': fitnesses,
+                    'solucoes': solucoes,  # Solução de cada entidade
+                    'n_entidades': len(fitnesses),
+                })
+            except Exception:
+                # Se alguma época falhar, pular silenciosamente
+                continue
+        
+        self._epoca_idx = len(self.epocas)
+        
+        # Atualizar pop_size real (pode variar por algoritmo)
+        if self.epocas:
+            self.pop_size = self.epocas[0].get('n_entidades', self.pop_size)
+    
     def recalcular_epocas(self, n_epocas):
         """
         Recalcula dados por época usando o número real de épocas (ex.: do MealPy).

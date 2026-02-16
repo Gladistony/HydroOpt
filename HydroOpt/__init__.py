@@ -7,7 +7,7 @@ from .visualizador_convergencia import VisualizadorConvergencia, ConvergenciaTra
 from .analisador_estatistico import AnalisadorEstatistico
 from .core import gerar_solucao_heuristica
 
-__version__ = "0.5.9"
+__version__ = "0.6.1"
 __all__ = ['Rede', 'LDiametro', 'Otimizador', 'VariadorDeParametros', 'VisualizadorConvergencia', 
            'ConvergenciaTracker', 'AnalisadorEstatistico',
            'testar_ldiametro', 'testar_rede', 'executar_todos_testes', 

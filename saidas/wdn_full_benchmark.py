@@ -30,57 +30,10 @@ except ImportError as e:
     raise e
 
 # Importações do MealPy
+import secrets
 from mealpy import swarm_based, evolutionary_based
 from mealpy.utils.problem import Problem
 from mealpy.utils.space import IntegerVar
-
-# ==============================================================================
-# 1. CLASSE OTIMIZADOR CUSTOMIZADA
-# ==============================================================================
-class OtimizadorCustomizado(Otimizador):
-    """
-    Subclasse com avaliação de rede customizada (penalidades mais agressivas).
-    """
-    def _avaliar_rede(self, solution=None, verbose=False):
-        self._resetar_rede()
-        custo_diametros = self._atualizar_diametros_rede(solution)
-
-        # Disponibilizar custo real e flags para o tracker
-        self._ultimo_custo_diametros = float(custo_diametros)
-        self._ultima_viavel = False
-        self._ultima_pressao_min = None
-
-        try:
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter("always")
-                sim_res = self.rede.simular(verbose=False)
-
-                if len(w) > 0:
-                    for warning in w:
-                        msg = str(warning.message).lower()
-                        if "converge" in msg or "balanced" in msg:
-                            return 1e12
-
-                if not sim_res.get('sucesso', False):
-                    return 1e12
-
-            p_info = self.rede.obter_pressao_minima(excluir_reservatorios=True, verbose=False)
-            pressao_min = p_info['valor']
-            self._ultima_pressao_min = pressao_min
-
-            if np.isnan(pressao_min) or np.isinf(pressao_min):
-                return 1e12
-
-            if pressao_min < self.pressao_min_desejada:
-                diferenca = self.pressao_min_desejada - pressao_min
-                penalidade = 1e7 * (diferenca ** 2) + 1e8
-                return custo_diametros + penalidade
-
-            self._ultima_viavel = True
-            return custo_diametros
-
-        except Exception:
-            return 1e12
 
 # ==============================================================================
 # 2. HELPER: GERADOR DE COMBINAÇÕES (VARIADOR)
@@ -125,7 +78,7 @@ def executar_cenario(metodo, params, rede_base, diametros, seed_solucao, log_dir
     epoch = p.pop('epoch', 100)
     pop_size = p.pop('pop_size', 50)
 
-    otimizador = OtimizadorCustomizado(
+    otimizador = Otimizador(
         rede=rede_base,
         diametros=diametros,
         pressao_min_desejada=30.0,
@@ -185,9 +138,21 @@ def executar_cenario(metodo, params, rede_base, diametros, seed_solucao, log_dir
 # 4. LOOP PRINCIPAL
 # ==============================================================================
 if __name__ == "__main__":
-    INP_FILE = "Hanoi.inp"
+    INP_FILE = "hanoiFIM"
     RESULT_CSV = "resultado_hydroopt_final.csv"
     LOG_DIR = "logs_detalhados_hydroopt"
+    
+    # Limpar execuções anteriores
+    print(">>> Limpando arquivos anteriores...")
+    if os.path.exists(RESULT_CSV):
+        os.remove(RESULT_CSV)
+        print(f"  ✓ Removido {RESULT_CSV}")
+    
+    if os.path.exists(LOG_DIR):
+        import shutil
+        shutil.rmtree(LOG_DIR)
+        print(f"  ✓ Removido {LOG_DIR}/")
+    
     os.makedirs(LOG_DIR, exist_ok=True)
 
     print(">>> [1/3] Carregando Rede e Diâmetros...")
@@ -260,32 +225,18 @@ if __name__ == "__main__":
 
                 jobs.append((nome_modelo, params, usar_heuristica, seed_atual))
 
-    # Verifica checkpoint
-    tarefas_concluidas = set()
-    if os.path.exists(RESULT_CSV):
-        with open(RESULT_CSV, 'r') as f:
-            reader = csv.reader(f)
-            next(reader, None)
-            for row in reader:
-                if len(row) > 2:
-                    chave = f"{row[0]}_{row[1]}_{row[2]}"
-                    tarefas_concluidas.add(chave)
-    else:
-        with open(RESULT_CSV, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                'Algoritmo', 'Usou_Heuristica', 'Parametros',
-                'Melhor_Custo', 'Custo_Real', 'Seed_Usado',
-                'Tempo_s', 'Arquivo_NPZ', 'Status'
-            ])
+    # Criar arquivo CSV com cabeçalhos
+    with open(RESULT_CSV, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            'Algoritmo', 'Usou_Heuristica', 'Parametros',
+            'Melhor_Custo', 'Custo_Real', 'Seed_Usado',
+            'Tempo_s', 'Arquivo_NPZ', 'Status'
+        ])
 
     print(f"\n>>> [3/3] Iniciando Benchmark: {len(jobs)} jobs totais.")
 
     for i, (algoritmo, params, usar_heuristica, seed) in enumerate(jobs, start=1):
-        chave_atual = f"{algoritmo}_{str(usar_heuristica)}_{str(params)}"
-        if chave_atual in tarefas_concluidas:
-            continue
-
         start_time = time.time()
         label = "WARM" if usar_heuristica else "COLD"
 
