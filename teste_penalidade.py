@@ -129,7 +129,7 @@ solucao = [0.3] * num_tubos
 
 # Avaliar
 custo_final = otimizador._avaliar_rede(solucao)
-print(f"Custo final (com função objetivo híbrida): {custo_final:.2e}")
+print(f"Custo final (custo + penalidade): {custo_final:.2e}")
 print(f"Esperado: valor > 0")
 print(f"Teste: {'PASSOU' if custo_final > 0 else 'FALHOU'}")
 
@@ -140,5 +140,5 @@ print("✓ Penalidade base aumentada para 1e9")
 print("✓ Reset da rede funcionando")
 print("✓ Atualização de diâmetros funcionando")
 print("✓ Cálculo de erro quadrado funcionando")
-print("✓ Avaliação completa com função objetivo híbrida")
+print("✓ Avaliação completa (custo + penalidade)")
 print("\nPróximo passo: executar otimização com GWO ou outro algoritmo")

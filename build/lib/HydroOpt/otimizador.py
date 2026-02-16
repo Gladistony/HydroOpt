@@ -280,14 +280,9 @@ class Otimizador:
             # Isso cria uma "rampa" suave para o lobo subir em direção à solução viável
             penalidade_pressao = 1e5 + (1e6 * deficiencia) + (1e7 * (deficiencia ** 2))
 
-        # Função objetivo: mistura de custo (60%) + erro quadrado (40%)
-        # Ambos penalizados se pressão for insuficiente
-        peso_custo = 0.6
-        peso_erro = 0.4
-        
-        custo_final = (peso_custo * custo_diametros + 
-                      peso_erro * erro_quadrado + 
-                      penalidade_pressao)
+        # Função objetivo: custo dos diâmetros + penalidade de pressão (erro quadrado removido)
+        # Retornamos custo real quando viável; penalties tornam soluções inviáveis muito caras
+        custo_final = custo_diametros + penalidade_pressao
 
         # Atualizar flag de viabilidade (sucesso da simulação + pressão atende)
         self._ultima_viavel = (pressao_min >= self.pressao_min_desejada)

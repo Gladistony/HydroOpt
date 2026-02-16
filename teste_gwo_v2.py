@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Script de otimização com a nova penalidade e função objetivo híbrida.
+"""Script de otimização com a nova penalidade e função objetivo (custo + penalidade).
 Testa GWO com parâmetros melhorados.
 """
 
@@ -8,7 +8,7 @@ from HydroOpt import Rede, LDiametro, Otimizador
 
 # Carregar rede
 print("\n" + "="*70)
-print("OTIMIZAÇÃO COM GWO - NOVA PENALIDADE E FUNÇÃO OBJETIVO HÍBRIDA")
+print("OTIMIZAÇÃO COM GWO - NOVA PENALIDADE E FUNÇÃO OBJETIVO (CUSTO + PENALIDADE)")
 print("="*70)
 
 rede = Rede(arquivo_inp='hanoiFIM')
@@ -91,9 +91,9 @@ print("="*70)
 print("""
 A otimização agora usa:
 1. Penalidade MUITO MAIOR (1e9 em vez de 1e5) para forçar restrições
-2. Função objetivo híbrida: 60% custo + 40% erro quadrado
+2. Função objetivo: custo + penalidade (erro quadrado removido)
 3. Reset automático da rede a cada avaliação
-4. Erro quadrado penaliza distância da pressão desejada
+4. Erro quadrado permanece disponível, mas não compõe a função objetivo
 
 Isto resulta em:
 - Soluções que respeitam a pressão mínima de forma agressiva
