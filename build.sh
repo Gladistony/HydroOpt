@@ -1,7 +1,7 @@
 #!/bin/bash
 # filepath: /home/gladistony/Github/HydroOpt/build.sh
 
-VERSION="0.5.8"
+VERSION="0.5.9"
 
 echo "🔨 Iniciando build versão $VERSION..."
 

@@ -588,6 +588,7 @@ class Otimizador:
             print(f"INICIANDO OTIMIZAÇÃO: {metodo}")
             print(f"{'='*60}")
             print(f"Épocas: {self.epoch} | População: {self.pop_size} | Workers: {workers}")
+            print(f"Seed: {self.seed_usado}")
             print(f"{'='*60}\n")
 
         
@@ -795,6 +796,14 @@ class Otimizador:
 
         # Registrar para recuperação
         self.seed_usado = int(seed_int)
+
+        # Sempre imprimir a seed para fins de reprodução
+        if self.verbose:
+            if seed is not None:
+                print(f"🔑 Seed fornecida: {self.seed_usado}")
+            else:
+                print(f"🔑 Seed gerada automaticamente: {self.seed_usado}  (guarde para reprodução)")
+
         return self.seed_usado
 
     def aplicar_solucao(self, solucao, simular=True):

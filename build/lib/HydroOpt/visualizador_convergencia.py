@@ -552,16 +552,20 @@ class ConvergenciaTracker:
         >>> stats = tracker.obter_estatisticas()
     """
     
-    def __init__(self, salvar_solucoes=False):
+    def __init__(self, pop_size=None, salvar_solucoes=False):
         """
         Inicializa o tracker.
         
         Args:
+            pop_size (int, optional): Tamanho da população. Se fornecido, permite
+                                      rastrear dados por época (epoch) e gerar
+                                      trajetórias individuais de cada partícula.
             salvar_solucoes (bool): Se True, salva a solução completa (vetor de diâmetros)
                                     a cada avaliação. Consome mais memória mas permite
                                     análise detalhada de como as soluções evoluíram.
         """
         self.salvar_solucoes = salvar_solucoes
+        self.pop_size = pop_size
         
         # Dados por avaliação
         self.historico_bruto = []          # fitness bruto por avaliação
@@ -570,6 +574,11 @@ class ConvergenciaTracker:
         self.historico_pressao_min = []    # pressão mínima por avaliação
         self.historico_viavel = []         # viabilidade por avaliação
         self.historico_solucoes = []       # soluções completas (se salvar_solucoes=True)
+        
+        # Dados por época (preenchidos quando pop_size é fornecido)
+        self._buffer_epoca = []            # buffer temporário da época atual
+        self._epoca_idx = 0               # contador de épocas
+        self.epocas = []                   # lista de dicts com dados por época
         
         # Estado
         self.melhor_fitness = float('inf')
@@ -625,6 +634,21 @@ class ConvergenciaTracker:
         if viavel and solucao is not None:
             if custo_real is not None and custo_real <= self.melhor_custo_real:
                 self.melhor_solucao = np.asarray(solucao, dtype=float).copy()
+        
+        # Rastreamento por época (acumula fitness de cada indivíduo)
+        if self.pop_size is not None and self.pop_size > 0:
+            self._buffer_epoca.append(float(fitness))
+            if len(self._buffer_epoca) >= self.pop_size:
+                self.epocas.append({
+                    'epoca': self._epoca_idx,
+                    'melhor': min(self._buffer_epoca),
+                    'media': float(np.mean(self._buffer_epoca)),
+                    'pior': max(self._buffer_epoca),
+                    'desvio': float(np.std(self._buffer_epoca)),
+                    'todos': list(self._buffer_epoca),
+                })
+                self._epoca_idx += 1
+                self._buffer_epoca = []
     
     # -----------------------------------------------------------
     # Acesso aos dados
@@ -853,8 +877,113 @@ class ConvergenciaTracker:
         self.historico_pressao_min = []
         self.historico_viavel = []
         self.historico_solucoes = []
+        self.epocas = []
+        self._buffer_epoca = []
+        self._epoca_idx = 0
         self.melhor_fitness = float('inf')
         self.melhor_custo_real = float('inf')
         self.melhor_solucao = None
         self.iteracao_atual = 0
+    
+    # -----------------------------------------------------------
+    # Dados por época
+    # -----------------------------------------------------------
+    def recalcular_epocas(self, n_epocas):
+        """
+        Recalcula dados por época usando o número real de épocas (ex.: do MealPy).
+        
+        Divide o histórico bruto em blocos iguais correspondentes a cada época.
+        Isso é mais preciso que a contagem por pop_size, pois alguns algoritmos
+        (ex.: ABC) avaliam mais indivíduos por época.
+        
+        Args:
+            n_epocas (int): Número real de épocas da otimização
+        """
+        n = len(self.historico_bruto)
+        if n_epocas <= 0 or n == 0:
+            return
+        
+        evals_por_epoca = n // n_epocas
+        if evals_por_epoca <= 0:
+            return
+        
+        self.epocas = []
+        self._epoca_idx = 0
+        
+        for i in range(n_epocas):
+            inicio = i * evals_por_epoca
+            fim = min((i + 1) * evals_por_epoca, n)
+            bloco = self.historico_bruto[inicio:fim]
+            
+            if bloco:
+                self.epocas.append({
+                    'epoca': i,
+                    'melhor': min(bloco),
+                    'media': float(np.mean(bloco)),
+                    'pior': max(bloco),
+                    'desvio': float(np.std(bloco)),
+                    'todos': list(bloco),
+                })
+        
+        self._epoca_idx = len(self.epocas)
+    
+    def obter_melhor_por_epoca(self):
+        """
+        Retorna a sequência best-so-far por época.
+        
+        Returns:
+            np.ndarray: Melhor fitness acumulado em cada época
+        """
+        if not self.epocas:
+            return np.array([])
+        bsf = float('inf')
+        result = []
+        for e in self.epocas:
+            bsf = min(bsf, e['melhor'])
+            result.append(bsf)
+        return np.array(result)
+    
+    def obter_media_por_epoca(self):
+        """
+        Retorna a média de fitness por época.
+        
+        Returns:
+            np.ndarray: Média de fitness de todos os indivíduos em cada época
+        """
+        if not self.epocas:
+            return np.array([])
+        return np.array([e['media'] for e in self.epocas])
+    
+    def obter_desvio_por_epoca(self):
+        """
+        Retorna o desvio padrão de fitness por época.
+        
+        Returns:
+            np.ndarray: Desvio padrão do fitness em cada época
+        """
+        if not self.epocas:
+            return np.array([])
+        return np.array([e['desvio'] for e in self.epocas])
+    
+    def obter_pior_por_epoca(self):
+        """
+        Retorna o pior fitness por época.
+        
+        Returns:
+            np.ndarray: Pior fitness em cada época
+        """
+        if not self.epocas:
+            return np.array([])
+        return np.array([e['pior'] for e in self.epocas])
+    
+    def obter_todos_por_epoca(self):
+        """
+        Retorna todos os valores de fitness de cada indivíduo por época.
+        Permite plotar a trajetória de TODAS as partículas/indivíduos.
+        
+        Returns:
+            list[list[float]]: Lista de listas, onde cada sublista contém
+                               o fitness de cada indivíduo naquela época
+        """
+        return [e['todos'] for e in self.epocas]
 
