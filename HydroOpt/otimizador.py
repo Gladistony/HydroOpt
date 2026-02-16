@@ -1,7 +1,7 @@
 import copy
 import logging
 from tqdm import tqdm
-from mealpy.utils.space import FloatVar
+from mealpy.utils.space import FloatVar, IntegerVar
 from mealpy.utils.problem import Problem
 
 # Suprimir warnings do WNTR durante otimização
@@ -165,10 +165,10 @@ class Otimizador:
     
     def _atualizar_diametros_rede(self, solution):
         """
-        Atualiza os diâmetros da rede baseado na solução (valores [0,1]).
+        Atualiza os diâmetros da rede baseado na solução (índices inteiros de diâmetros).
         
         Args:
-            solution (list): Lista de valores [0,1] para mapear aos diâmetros disponíveis.
+            solution (list): Lista de índices inteiros [0, n_diâmetros-1] dos diâmetros.
         
         Returns:
             float: Custo total dos diâmetros aplicados
@@ -179,13 +179,14 @@ class Otimizador:
             return custo_diametros
         
         diametros_disponiveis = self.diametros.obter_diametros()
+        n_diametros = len(diametros_disponiveis)
         
-        # Mapear valores [0,1] para índices de diâmetros
+        # Mapear índices inteiros para diâmetros disponíveis
         for i, pipe_name in enumerate(self.rede.wn.pipe_name_list):
             if i < len(solution):
-                # Converter valor [0,1] para índice de diâmetro
-                idx = int(solution[i] * (len(diametros_disponiveis) - 1))
-                idx = min(max(0, idx), len(diametros_disponiveis) - 1)
+                # Índice direto do diâmetro (IntegerVar)
+                idx = int(round(float(solution[i])))
+                idx = min(max(0, idx), n_diametros - 1)
                 
                 diametro_escolhido = diametros_disponiveis[idx]
                 pipe = self.rede.wn.get_link(pipe_name)
@@ -524,7 +525,7 @@ class Otimizador:
         # Inicializar rastreador de convergência
         if rastrear_convergencia:
             from .visualizador_convergencia import ConvergenciaTracker
-            convergencia_tracker = ConvergenciaTracker(salvar_solucoes=salvar_solucoes)
+            convergencia_tracker = ConvergenciaTracker(pop_size=self.pop_size, salvar_solucoes=salvar_solucoes)
         
         # Estimar total de avaliações (épocas * população)
         total_evals = max(1, int(self.epoch) * int(self.pop_size))
@@ -570,9 +571,10 @@ class Otimizador:
 
                 return [value]
 
-        # Problema para MealPy 3.0+: Uma variável [0,1] para cada tubo
+        # Problema para MealPy 3.0+: Uma variável inteira [0, n_diâmetros-1] para cada tubo
+        n_diametros = len(self.diametros.obter_diametros()) if self.diametros else 2
         problem = HydroNetworkProblem(
-            bounds=[FloatVar(lb=0, ub=1) for _ in range(n_tubos)],
+            bounds=[IntegerVar(lb=0, ub=n_diametros - 1) for _ in range(n_tubos)],
             minmax='min',
             log_to=None,
         )
@@ -613,15 +615,20 @@ class Otimizador:
                     if arr.size == 1:
                         arr = np.full(n_tubos, float(arr[0]))
 
-                    # Sanitizar NaN/Inf e limitar a [0,1]
-                    arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
-                    arr = np.clip(arr, 0.0, 1.0)
+                    # Auto-detectar formato [0,1] antigo e converter para índices inteiros
+                    has_fractional = np.any(arr != np.floor(arr))
+                    if has_fractional and arr.max() <= 1.0 and arr.min() >= 0.0:
+                        arr = np.round(arr * (n_diametros - 1))
+
+                    # Sanitizar NaN/Inf e limitar a [0, n_diametros-1]
+                    arr = np.nan_to_num(arr, nan=0.0, posinf=float(n_diametros - 1), neginf=0.0)
+                    arr = np.clip(np.round(arr), 0, n_diametros - 1)
 
                     if arr.size != n_tubos:
                         info_idx = f" (indivíduo {idx})" if idx is not None else ""
                         raise ValueError(
                             f"solucao_inicial{info_idx}: tamanho {arr.size}, esperado {n_tubos}. "
-                            "Forneça um valor em [0,1] para cada tubo da rede."
+                            f"Forneça um índice de diâmetro [0, {n_diametros-1}] para cada tubo."
                         )
                     return arr
 
@@ -633,7 +640,7 @@ class Otimizador:
                         populacao_final = [solucao_unica]
                         qtd_restante = int(self.pop_size) - 1
                         if qtd_restante > 0:
-                            aleatorios = np.random.uniform(0.0, 1.0, (qtd_restante, n_tubos))
+                            aleatorios = np.random.randint(0, n_diametros, (qtd_restante, n_tubos)).astype(float)
                             populacao_final.extend(aleatorios)
                         if self.verbose:
                             print(f"🚀 Warm Start: Gerando {self.pop_size - 1} indivíduos aleatórios a partir da guia.")
@@ -658,7 +665,7 @@ class Otimizador:
                         populacao_final = [solucao_unica]
                         qtd_restante = int(self.pop_size) - 1
                         if qtd_restante > 0:
-                            aleatorios = np.random.uniform(0.0, 1.0, (qtd_restante, n_tubos))
+                            aleatorios = np.random.randint(0, n_diametros, (qtd_restante, n_tubos)).astype(float)
                             populacao_final.extend(aleatorios)
                         solve_kwargs['starting_solutions'] = populacao_final
                     else:
@@ -684,6 +691,18 @@ class Otimizador:
         # Calculamos o custo financeiro puro (sem penalidades de pressão)
         custo_real_investimento = self._atualizar_diametros_rede(melhor_solucao)
         # -----------------------------------------------------
+
+        # Extrair histórico por época do MealPy (número real de épocas)
+        historico_epocas_mealpy = []
+        try:
+            if hasattr(modelo, 'history') and modelo.history is not None:
+                for ep_agent in modelo.history.list_global_best:
+                    historico_epocas_mealpy.append(ep_agent.target.objectives[0])
+                # Recalcular épocas do tracker com o número real de épocas do MealPy
+                if rastrear_convergencia and len(historico_epocas_mealpy) > 0:
+                    convergencia_tracker.recalcular_epocas(len(historico_epocas_mealpy))
+        except Exception:
+            pass
         
         # Rastrear convergência final se habilitado (inclui custo real estimado)
         if rastrear_convergencia:
@@ -723,6 +742,17 @@ class Otimizador:
             resultado['historico_fitness_bruto'] = convergencia_tracker.obter_historico_bruto()
             resultado['tracker'] = convergencia_tracker
             resultado['estatisticas_convergencia'] = convergencia_tracker.obter_estatisticas()
+            
+            # Dados por época (para gráficos de convergência suave)
+            resultado['melhor_por_epoca'] = convergencia_tracker.obter_melhor_por_epoca()
+            resultado['media_por_epoca'] = convergencia_tracker.obter_media_por_epoca()
+            resultado['desvio_por_epoca'] = convergencia_tracker.obter_desvio_por_epoca()
+            resultado['todos_por_epoca'] = convergencia_tracker.obter_todos_por_epoca()
+            resultado['epocas'] = convergencia_tracker.epocas
+            
+            # Histórico do MealPy (best-so-far por época via MealPy)
+            if historico_epocas_mealpy:
+                resultado['historico_mealpy_por_epoca'] = historico_epocas_mealpy
         
         return resultado
 
@@ -772,7 +802,7 @@ class Otimizador:
         Aplica uma solução otimizada à rede e opcionalmente simula.
         
         Args:
-            solucao (list): Array de valores [0,1] dos diâmetros (saída de otimizar())
+            solucao (list): Array de índices inteiros dos diâmetros (saída de otimizar())
             simular (bool): Se True, executa simulação e retorna dados da rede
         
         Returns:
@@ -795,8 +825,8 @@ class Otimizador:
         lista_diametros = self.diametros.obter_diametros()
         
         for i, tubo in enumerate(self.rede.wn.pipe_name_list):
-            # Mapear valor [0,1] para índice de diâmetro (mesma lógica usada em _atualizar_diametros_rede)
-            indice = int(solucao[i] * (len(lista_diametros) - 1))
+            # Índice direto do diâmetro (mesma lógica usada em _atualizar_diametros_rede)
+            indice = int(round(float(solucao[i])))
             indice = min(max(0, indice), len(lista_diametros) - 1)
             diametro_selecionado = lista_diametros[indice]
             diametros_dict[tubo] = diametro_selecionado

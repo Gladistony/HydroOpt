@@ -113,19 +113,12 @@ def gerar_solucao_heuristica(rede, lista_diametros, pressao_min_desejada=10.0, i
                     indices_atuais[idx_lista] += 1
                     break
 
-    # Converter índices atuais em solução [0,1]
-    # (mapeando opção mais barata -> 0.0, mais cara -> 1.0)
-    if num_opcoes <= 1:
-        solucao = [0.0] * num_tubos
-    else:
-        solucao = [idx_atual / (num_opcoes - 1) for idx_atual in indices_atuais]
-
-    # Sanitizar NaN/Inf e limitar a [0,1]
-    solucao = np.nan_to_num(np.asarray(solucao, dtype=float), nan=0.0, posinf=1.0, neginf=0.0)
-    solucao = np.clip(solucao, 0.0, 1.0)
+    # Retornar índices inteiros diretamente (compatível com IntegerVar)
+    solucao = np.array(indices_atuais, dtype=int)
+    solucao = np.clip(solucao, 0, max(0, num_opcoes - 1))
 
     if verbose:
-        print(f"✓ Solução heurística gerada: {num_tubos} tubos normalizados")
+        print(f"✓ Solução heurística gerada: {num_tubos} tubos (índices de diâmetros [0, {num_opcoes-1}])")
         print(f"✓ Tempo total: {time.time() - inicio:.2f}s\n")
 
     return solucao.tolist()
